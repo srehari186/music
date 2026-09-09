@@ -8,7 +8,8 @@ An original, production-ready music streaming web app inspired by modern platfor
 
 **Listeners**
 - Signup (no email confirmation), login, logout, password reset
-- Home with Recently Added / Featured / Trending / Recommended / Recently Played
+- Home with Recently Added (albums + singles) / Featured / Trending / Recommended / Recently Played
+- Album pages (`/album?name=…&artist=…`): MEGA-folder imports sharing an album appear as one album card with a shared cover; play the whole album or individual tracks
 - Server-side search (title, artist, album, genre) — never downloads the whole table
 - Persistent bottom player: play/pause, next/prev, seek, volume, mute, shuffle, repeat (off/all/one), queue
 - Like/unlike songs, playlists (create/rename/delete, add/remove, play, shuffle), profile editing

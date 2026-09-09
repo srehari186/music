@@ -15,6 +15,7 @@ import { LibraryPage } from './pages/Library/LibraryPage'
 import { LikedSongsPage } from './pages/LikedSongs/LikedSongsPage'
 import { PlaylistsPage } from './pages/Playlists/PlaylistsPage'
 import { PlaylistDetailsPage } from './pages/PlaylistDetails/PlaylistDetailsPage'
+import { AlbumPage } from './pages/Album/AlbumPage'
 import { ProfilePage } from './pages/Profile/ProfilePage'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/liked" element={<LikedSongsPage />} />
               <Route path="/playlists" element={<PlaylistsPage />} />
               <Route path="/playlist/:id" element={<PlaylistDetailsPage />} />
+              <Route path="/album" element={<AlbumPage />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
