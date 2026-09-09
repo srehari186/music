@@ -196,20 +196,30 @@ export async function resolveMegaAudio(
   // overriding the User-Agent header, which breaks requests otherwise).
   file.api.userAgent = null
 
+  let loadedNode: MegaFileLike | undefined
   try {
-    await file.loadAttributes()
+    // When the link embeds a file inside a shared folder
+    // (…/folder/ID#KEY/file/FILEID), this resolves to that child node.
+    loadedNode = (await file.loadAttributes()) as MegaFileLike | undefined
   } catch (e) {
     throw new Error(megaFriendlyError(e))
   }
   if (cancel?.cancelled()) throw new MegaCancelledError()
 
+  // Per-file links inside a shared folder resolve loadAttributes() directly
+  // to that child node. A bare folder link falls back to the
+  // embedded/first audio file found inside.
   let target = file
   if (file.directory) {
-    const picked = pickAudioFromFolder(file)
-    if (!picked) {
-      throw new Error('No playable audio file was found in this MEGA folder link. Link a file, or a folder containing audio (mp3, m4a, ogg, wav, flac…).')
+    if (loadedNode && loadedNode !== file && !loadedNode.directory && loadedNode.name) {
+      target = loadedNode
+    } else {
+      const picked = pickAudioFromFolder(file)
+      if (!picked) {
+        throw new Error('No playable audio file was found in this MEGA folder link. Link a file, or a folder containing audio (mp3, m4a, ogg, wav, flac…).')
+      }
+      target = picked
     }
-    target = picked
   }
 
   const total: number | null = typeof target.size === 'number' ? target.size : null
@@ -305,4 +315,104 @@ export async function resolveAudioSource(
   if (!isMegaUrl(url)) return url
   const resolved = await resolveMegaAudio(url, onProgress, cancel)
   return resolved.objectUrl
+}
+
+// ---- MEGA folder -> album import --------------------------------------------
+
+export interface MegaFolderTrack {
+  /** MEGA node id — embedded into the per-song link as …/file/<id> */
+  id: string
+  name: string
+  size: number | null
+}
+
+function isFolderLink(url: string): boolean {
+  const t = url.trim()
+  try {
+    const u = new URL(t)
+    if (u.pathname.includes('/folder/')) return true
+    // Legacy format: https://mega.nz/#F!FOLDER_ID!KEY[!FILE_ID]
+    if (u.hash.startsWith('#F')) return true
+  } catch {
+    /* fall through */
+  }
+  return false
+}
+
+/** Strip an embedded …/file/<id> (or legacy !<id>) so we list the whole folder. */
+function stripEmbeddedFile(url: string): string {
+  const t = url.trim()
+  const cut = t.indexOf('/file/')
+  if (cut !== -1) return t.slice(0, cut)
+  const m = t.match(/^(https:\/\/mega\.(nz|co\.nz)\/#F![^!]+![^!]+)!.+$/)
+  if (m) return m[1]
+  return t
+}
+
+/**
+ * Build the per-song link for one file inside a shared folder:
+ * new format appends `/file/<nodeId>` to the folder link's hash,
+ * legacy `#F!FID!FKEY` links append `!<nodeId>`.
+ */
+export function buildMegaFileUrl(folderUrl: string, nodeId: string): string {
+  const base = stripEmbeddedFile(folderUrl)
+  if (base.includes('/file/')) return base // unreachable, but stay safe
+  if (/#F![^!]+![^!]+$/.test(base)) return `${base}!${nodeId}`
+  const hashIdx = base.indexOf('#')
+  if (hashIdx === -1) return base
+  return `${base}/file/${nodeId}`
+}
+
+/** "01 - Midnight Run_.mp3" -> "01 - Midnight Run" */
+export function suggestTrackTitle(fileName: string): string {
+  const withoutExt = fileName.replace(/\.[a-z0-9]{2,5}$/i, '')
+  return withoutExt.replace(/[_]+/g, ' ').replace(/\s{2,}/g, ' ').trim() || fileName
+}
+
+function collectAudioTracks(files: MegaFileLike[], out: MegaFolderTrack[]): void {
+  const sorted = [...files].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+  for (const f of sorted) {
+    if (f.directory) {
+      if (f.children) collectAudioTracks(f.children, out)
+    } else if (f.name && isAudioName(f.name) && (f.nodeId || f.downloadId)) {
+      out.push({ id: (f.nodeId ?? f.downloadId) as string, name: f.name, size: typeof f.size === 'number' ? f.size : null })
+    }
+  }
+}
+
+/**
+ * List the playable audio files inside a MEGA folder link (recursive).
+ * Used by the admin "import folder as album" flow.
+ */
+export async function listMegaFolderTracks(folderUrl: string): Promise<MegaFolderTrack[]> {
+  const key = stripEmbeddedFile(folderUrl)
+  if (!isMegaUrl(key)) throw new Error('That does not look like a MEGA link.')
+  if (!isFolderLink(key)) {
+    throw new Error('That is a single-file link, not a folder. Use “Add song” for single files, or paste a mega.nz/folder/… link here.')
+  }
+  let mega: unknown
+  try {
+    mega = await import('megajs')
+  } catch {
+    throw new Error('The MEGA streamer failed to load (network). Please check your connection and try again.')
+  }
+  const { File: MegaFile } = mega as unknown as { File: MegaFileConstructor }
+  let folder: MegaFileLike
+  try {
+    folder = MegaFile.fromURL(key)
+  } catch (e) {
+    throw new Error(megaFriendlyError(e))
+  }
+  folder.api.userAgent = null
+  try {
+    await folder.loadAttributes()
+  } catch (e) {
+    throw new Error(megaFriendlyError(e))
+  }
+  if (!folder.directory || !folder.children) {
+    throw new Error('Could not read this folder. The link may be wrong or missing its key.')
+  }
+  const tracks: MegaFolderTrack[] = []
+  collectAudioTracks(folder.children, tracks)
+  return tracks
 }

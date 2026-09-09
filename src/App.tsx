@@ -21,6 +21,7 @@ import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminDashboardPage } from './pages/admin/DashboardPage'
 import { AdminSongsPage } from './pages/admin/SongsPage'
 import { AddSongPage } from './pages/admin/AddSongPage'
+import { FolderImportPage } from './pages/admin/FolderImportPage'
 import { EditSongPage } from './pages/admin/EditSongPage'
 import { AdminUsersPage } from './pages/admin/UsersPage'
 
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/songs" element={<AdminSongsPage />} />
               <Route path="/admin/songs/new" element={<AddSongPage />} />
+              <Route path="/admin/songs/import" element={<FolderImportPage />} />
               <Route path="/admin/songs/:id/edit" element={<EditSongPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>

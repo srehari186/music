@@ -17,6 +17,7 @@ An original, production-ready music streaming web app inspired by modern platfor
 **Admins (separate `/admin/login`, Supabase Auth + `profiles.role`, RLS-enforced)**
 - Dashboard: total users/songs/playlists/plays, most-played bars, recently added, recent users
 - Song management: search/filter/sort, add, edit, delete (with confirm)
+- **MEGA folder → album import** (`/admin/songs/import`): paste a `mega.nz/folder/…#key…` link, every audio file inside becomes a song sharing one album name + cover image (each track streams individually via its own `…/file/<id>` link)
 - Users list (no passwords ever exposed)
 
 ## Technology stack
