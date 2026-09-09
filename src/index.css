@@ -78,3 +78,23 @@ input[type='range'].wv-range::-moz-range-thumb {
   outline: 2px solid #7c5cff;
   outline-offset: 2px;
 }
+
+/* Seek bar becomes the loading indicator while a source is being fetched
+   (e.g. a MEGA link decrypting): determinate fill shimmers, indeterminate
+   sweeps across until the total size is known. */
+.loading-fill {
+  background-size: 200% 100%;
+  animation: loadshimmer 1.6s linear infinite;
+  transition: width 0.2s ease;
+}
+.loading-slide {
+  animation: loadslide 1.2s ease-in-out infinite;
+}
+@keyframes loadshimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes loadslide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}

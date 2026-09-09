@@ -25,6 +25,9 @@ export function AudioPlayer() {
   if (!song) return null
 
   const progress = p.duration > 0 ? (p.currentTime / p.duration) * 100 : 0
+  // While a MEGA link is being fetched/decrypted there is no playable
+  // timeline yet — the seek bar itself becomes the loading indicator.
+  const fetching = p.isLoading && p.loadDetail != null
 
   return (
     <>
@@ -72,31 +75,22 @@ export function AudioPlayer() {
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-abyss/92 backdrop-blur-xl md:bottom-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {/* MEGA fetch / decrypt progress */}
-        {p.isLoading && p.loadDetail && (
-          <div className="px-3 pt-2 md:px-6" role="status" aria-live="polite">
-            <div className="mx-auto flex max-w-7xl items-center gap-3">
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-aqua" aria-hidden />
-              <p className="flex-1 truncate text-[11px] font-medium text-aqua">{p.loadDetail}</p>
-              {p.loadProgress != null && (
-                <span className="text-[11px] tabular-nums text-white/60">{Math.round(p.loadProgress * 100)}%</span>
-              )}
-            </div>
-            <div className="mx-auto mt-1.5 h-1 max-w-7xl overflow-hidden rounded-full bg-white/10">
+        {/* progress / fetch-loading bar */}
+        <div className="group relative h-1 w-full bg-white/10" role="presentation">
+          {fetching ? (
+            <div className="absolute inset-0 overflow-hidden" aria-hidden>
               {p.loadProgress != null ? (
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-aqua transition-[width]"
+                  className="loading-fill h-full bg-gradient-to-r from-primary via-aqua to-primary"
                   style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
                 />
               ) : (
-                <div className="skeleton h-full w-full" aria-hidden />
+                <div className="loading-slide h-full w-1/3 bg-gradient-to-r from-transparent via-aqua to-transparent" />
               )}
             </div>
-          </div>
-        )}
-        {/* progress */}
-        <div className="group relative h-1 w-full bg-white/10" role="presentation">
-          <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-aqua" style={{ width: `${progress}%` }} />
+          ) : (
+            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-aqua" style={{ width: `${progress}%` }} />
+          )}
           <label htmlFor="wv-seek" className="sr-only">Seek</label>
           <input
             id="wv-seek"
@@ -106,10 +100,16 @@ export function AudioPlayer() {
             step={0.5}
             value={p.currentTime}
             onChange={(e) => p.seek(Number(e.target.value))}
-            className="wv-range absolute inset-x-0 -top-1.5 h-4 w-full opacity-0 transition group-hover:opacity-100"
-            aria-valuetext={`${formatTime(p.currentTime)} of ${formatTime(p.duration)}`}
+            disabled={fetching}
+            className="wv-range absolute inset-x-0 -top-1.5 h-4 w-full opacity-0 transition group-hover:opacity-100 disabled:opacity-0"
+            aria-valuetext={fetching ? 'Loading audio' : `${formatTime(p.currentTime)} of ${formatTime(p.duration)}`}
           />
         </div>
+        {fetching && (
+          <p className="sr-only" role="status">
+            {p.loadDetail}
+          </p>
+        )}
 
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2.5 md:gap-4 md:px-6 md:pb-16 md:pt-3 lg:pb-3">
           {/* Mobile bottom nav offset: player sits above nav on mobile */}
@@ -159,17 +159,32 @@ export function AudioPlayer() {
 
           <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
             <span className="w-10 text-right text-[11px] tabular-nums text-white/50">{formatTime(p.currentTime)}</span>
-            <label htmlFor="wv-seek2" className="sr-only">Seek</label>
-            <input
-              id="wv-seek2"
-              type="range"
-              min={0}
-              max={p.duration || 0}
-              step={0.5}
-              value={p.currentTime}
-              onChange={(e) => p.seek(Number(e.target.value))}
-              className="wv-range w-full"
-            />
+            {fetching ? (
+              <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
+                {p.loadProgress != null ? (
+                  <div
+                    className="loading-fill h-full rounded-full bg-gradient-to-r from-primary via-aqua to-primary"
+                    style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
+                  />
+                ) : (
+                  <div className="loading-slide h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-aqua to-transparent" />
+                )}
+              </div>
+            ) : (
+              <>
+                <label htmlFor="wv-seek2" className="sr-only">Seek</label>
+                <input
+                  id="wv-seek2"
+                  type="range"
+                  min={0}
+                  max={p.duration || 0}
+                  step={0.5}
+                  value={p.currentTime}
+                  onChange={(e) => p.seek(Number(e.target.value))}
+                  className="wv-range w-full"
+                />
+              </>
+            )}
             <span className="w-10 text-[11px] tabular-nums text-white/50">{formatTime(p.duration)}</span>
           </div>
 
