@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+body {
+  @apply bg-void text-white font-body antialiased;
+  background-image:
+    radial-gradient(900px 420px at 10% -5%, rgba(124, 92, 255, 0.22), transparent 60%),
+    radial-gradient(800px 380px at 95% 10%, rgba(34, 211, 238, 0.12), transparent 60%),
+    radial-gradient(700px 500px at 50% 110%, rgba(251, 113, 133, 0.08), transparent 60%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 10px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a48; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a5e; }
+
+.glass {
+  background: rgba(20, 20, 40, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+.card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(124,92,255,0.25); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #1b1b33;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.08) 50%, transparent 80%);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+input[type='range'].wv-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  outline: none;
+  cursor: pointer;
+}
+input[type='range'].wv-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 12px rgba(124,92,255,0.8);
+}
+input[type='range'].wv-range::-moz-range-thumb {
+  width: 12px; height: 12px; border: none;
+  border-radius: 999px; background: #fff;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #7c5cff;
+  outline-offset: 2px;
+}
