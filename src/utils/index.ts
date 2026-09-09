@@ -88,5 +88,5 @@ export function classifyAudioUrl(url: string): { playable: boolean; warning?: st
 export function coverFallback(title: string, artist?: string | null): string {
   const seed = encodeURIComponent(`${title}-${artist ?? 'waveora'}`)
   // Deterministic gradient placeholder (no external copyrighted art)
-  return `https://api.dicebear.com/9.x/shapes/svg?seed=${seed}&backgroundColor=1b1b33,141428`
+  return `https://api.dicebear.com/9.x/shapes/svg?seed=${seed}&backgroundColor=2c1114,1f0c0e`
 }

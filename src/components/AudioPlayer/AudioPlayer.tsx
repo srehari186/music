@@ -60,7 +60,7 @@ export function AudioPlayer() {
                   <button
                     onClick={() => p.playSongs(p.queue, i)}
                     className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-white/5 focus-ring ${
-                      i === p.queueIndex ? 'text-aqua' : ''
+                      i === p.queueIndex ? 'text-flame' : ''
                     }`}
                   >
                     <span className="w-5 text-xs text-white/40">{i + 1}</span>
@@ -81,15 +81,15 @@ export function AudioPlayer() {
             <div className="absolute inset-0 overflow-hidden" aria-hidden>
               {p.loadProgress != null ? (
                 <div
-                  className="loading-fill h-full bg-gradient-to-r from-primary via-aqua to-primary"
+                  className="loading-fill h-full bg-gradient-to-r from-primary via-flame to-primary"
                   style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
                 />
               ) : (
-                <div className="loading-slide h-full w-1/3 bg-gradient-to-r from-transparent via-aqua to-transparent" />
+                <div className="loading-slide h-full w-1/3 bg-gradient-to-r from-transparent via-flame to-transparent" />
               )}
             </div>
           ) : (
-            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-aqua" style={{ width: `${progress}%` }} />
+            <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-flame" style={{ width: `${progress}%` }} />
           )}
           <label htmlFor="wv-seek" className="sr-only">Seek</label>
           <input
@@ -123,7 +123,7 @@ export function AudioPlayer() {
               <p className="truncate text-sm font-semibold">{song.title}</p>
               <p className="truncate text-xs text-white/55">{song.artist ?? 'Unknown artist'}</p>
             </div>
-            {p.isLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-aqua" aria-label="Loading audio" />}
+            {p.isLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-flame" aria-label="Loading audio" />}
           </div>
 
           <div className="flex items-center gap-1 md:gap-2">
@@ -131,7 +131,7 @@ export function AudioPlayer() {
               onClick={p.toggleShuffle}
               aria-label="Toggle shuffle"
               aria-pressed={p.shuffle}
-              className={`hidden rounded-full p-2 transition focus-ring sm:block ${p.shuffle ? 'text-aqua' : 'text-white/50 hover:text-white'}`}
+              className={`hidden rounded-full p-2 transition focus-ring sm:block ${p.shuffle ? 'text-flame' : 'text-white/50 hover:text-white'}`}
             >
               <Shuffle className="h-4 w-4" />
             </button>
@@ -151,7 +151,7 @@ export function AudioPlayer() {
             <button
               onClick={p.cycleRepeat}
               aria-label={`Repeat mode: ${p.repeat}`}
-              className={`hidden rounded-full p-2 transition focus-ring sm:block ${p.repeat !== 'off' ? 'text-aqua' : 'text-white/50 hover:text-white'}`}
+              className={`hidden rounded-full p-2 transition focus-ring sm:block ${p.repeat !== 'off' ? 'text-flame' : 'text-white/50 hover:text-white'}`}
             >
               {p.repeat === 'one' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
             </button>
@@ -163,11 +163,11 @@ export function AudioPlayer() {
               <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
                 {p.loadProgress != null ? (
                   <div
-                    className="loading-fill h-full rounded-full bg-gradient-to-r from-primary via-aqua to-primary"
+                    className="loading-fill h-full rounded-full bg-gradient-to-r from-primary via-flame to-primary"
                     style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
                   />
                 ) : (
-                  <div className="loading-slide h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-aqua to-transparent" />
+                  <div className="loading-slide h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-flame to-transparent" />
                 )}
               </div>
             ) : (
@@ -207,7 +207,7 @@ export function AudioPlayer() {
               onClick={() => setQueueOpen((o) => !o)}
               aria-label="Toggle queue"
               aria-expanded={queueOpen}
-              className={`rounded-full p-2 transition focus-ring ${queueOpen ? 'text-aqua' : 'text-white/60 hover:text-white'}`}
+              className={`rounded-full p-2 transition focus-ring ${queueOpen ? 'text-flame' : 'text-white/60 hover:text-white'}`}
             >
               <ListMusic className="h-4 w-4" />
             </button>

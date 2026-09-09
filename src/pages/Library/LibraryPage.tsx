@@ -52,15 +52,15 @@ export function LibraryPage() {
       <section aria-label="Playlists">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display text-xl font-bold">
-            <ListMusic className="h-5 w-5 text-aqua" /> Playlists ({playlists.length})
+            <ListMusic className="h-5 w-5 text-flame" /> Playlists ({playlists.length})
           </h2>
-          <Link to="/playlists" className="text-sm font-semibold text-aqua hover:text-aqua-soft">
+          <Link to="/playlists" className="text-sm font-semibold text-flame hover:text-flame-soft">
             Manage
           </Link>
         </div>
         {playlists.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-panel/40 p-6 text-center text-sm text-white/50">
-            No playlists yet. <Link to="/playlists" className="text-aqua underline">Create your first one</Link>.
+            No playlists yet. <Link to="/playlists" className="text-flame underline">Create your first one</Link>.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -76,7 +76,7 @@ export function LibraryPage() {
           <h2 className="flex items-center gap-2 font-display text-xl font-bold">
             <Heart className="h-5 w-5 text-rose" /> Liked Songs ({liked.length})
           </h2>
-          <Link to="/liked" className="text-sm font-semibold text-aqua hover:text-aqua-soft">
+          <Link to="/liked" className="text-sm font-semibold text-flame hover:text-flame-soft">
             View all
           </Link>
         </div>

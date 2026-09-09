@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <Link to="/home" className="flex items-center gap-2.5 focus-ring rounded-xl" aria-label="Waveora home">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-aqua shadow-glow">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-flame shadow-glow">
         <AudioLines className="h-5 w-5 text-white" aria-hidden />
       </span>
       {!compact && (

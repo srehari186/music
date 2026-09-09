@@ -58,7 +58,7 @@ export function AdminUsersPage() {
                       {u.avatar_url ? (
                         <img src={u.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" loading="lazy" />
                       ) : (
-                        <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-primary to-aqua text-xs font-bold">
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-primary to-flame text-xs font-bold">
                           {(u.display_name ?? u.email ?? '?').slice(0, 1).toUpperCase()}
                         </span>
                       )}

@@ -28,12 +28,12 @@ export function AdminLayout() {
     <div className="flex min-h-screen">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-abyss/70 p-4 md:flex" aria-label="Admin navigation">
         <div className="flex items-center gap-2.5 px-1 py-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-aqua">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-flame">
             <AudioLines className="h-5 w-5 text-white" />
           </span>
           <div>
             <p className="font-display font-extrabold leading-none">Waveora</p>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-aqua">Admin console</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-flame">Admin console</p>
           </div>
         </div>
         <nav className="mt-4 flex flex-col gap-1">

@@ -4,19 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        void: '#080813',
-        abyss: '#0e0e1e',
-        panel: '#141428',
-        panel2: '#1b1b33',
+        void: '#0a0506',
+        abyss: '#14090b',
+        panel: '#1f0c0e',
+        panel2: '#2c1114',
         line: 'rgba(255,255,255,0.08)',
         primary: {
-          DEFAULT: '#7c5cff',
-          soft: '#9d86ff',
-          deep: '#5a3df0'
+          DEFAULT: '#e8262f',
+          soft: '#ff8080',
+          deep: '#a30f1a'
         },
-        aqua: {
-          DEFAULT: '#22d3ee',
-          soft: '#7ce7f7'
+        flame: {
+          DEFAULT: '#ff6a2b',
+          soft: '#ffa25e'
         },
         ember: '#ffb454',
         rose: '#fb7185'
@@ -26,7 +26,7 @@ export default {
         body: ['"Inter"', 'ui-sans-serif', 'system-ui', 'sans-serif']
       },
       boxShadow: {
-        glow: '0 0 40px rgba(124,92,255,0.35)',
+        glow: '0 0 40px rgba(232,38,47,0.35)',
         card: '0 12px 40px rgba(0,0,0,0.45)'
       },
       borderRadius: {

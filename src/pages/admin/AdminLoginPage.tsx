@@ -45,18 +45,18 @@ export function AdminLoginPage() {
       <div className="w-full max-w-md">
         <div className="glass rounded-3xl p-8 shadow-card">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-aqua shadow-glow">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-flame shadow-glow">
               <AudioLines className="h-6 w-6 text-white" />
             </span>
             <div>
               <p className="font-display text-xl font-extrabold">Waveora Console</p>
-              <p className="flex items-center gap-1 text-xs uppercase tracking-[0.2em] text-aqua">
+              <p className="flex items-center gap-1 text-xs uppercase tracking-[0.2em] text-flame">
                 <ShieldCheck className="h-3.5 w-3.5" /> Admin login
               </p>
             </div>
           </div>
           <p className="mt-4 text-sm text-white/60">
-            Sign in with an admin account (Supabase Auth + <code className="text-aqua">profiles.role = admin</code>). No hardcoded credentials.
+            Sign in with an admin account (Supabase Auth + <code className="text-flame">profiles.role = admin</code>). No hardcoded credentials.
           </p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
             {error && (

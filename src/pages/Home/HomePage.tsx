@@ -101,8 +101,8 @@ export function HomePage() {
     <div className="space-y-10">
       <section className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/25 blur-[100px]" aria-hidden />
-        <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-aqua/15 blur-[100px]" aria-hidden />
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aqua">{greeting}</p>
+        <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-flame/15 blur-[100px]" aria-hidden />
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-flame">{greeting}</p>
         <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
           {profile?.display_name ? `${profile.display_name}, ride` : 'Ride'} your sound wave
         </h1>
@@ -116,7 +116,7 @@ export function HomePage() {
 
       {history.length > 0 && (
         <section aria-label="Recently played">
-          <SectionHead icon={<Clock3 className="h-5 w-5 text-aqua" />} title="Jump back in" subtitle="Your recent rotations" />
+          <SectionHead icon={<Clock3 className="h-5 w-5 text-flame" />} title="Jump back in" subtitle="Your recent rotations" />
           <div className="rounded-2xl border border-line bg-panel/60 p-2">
             {history.slice(0, 5).map((h, i) => (
               <div key={h.id} className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export function HomePage() {
       </section>
 
       <section aria-label="Popular songs">
-        <SectionHead icon={<Flame className="h-5 w-5 text-aqua" />} title="Trending now" subtitle="Most played across Waveora" />
+        <SectionHead icon={<Flame className="h-5 w-5 text-flame" />} title="Trending now" subtitle="Most played across Waveora" />
         <div className="rounded-2xl border border-line bg-panel/60 p-2">
           {popular.filter(filterFn).slice(0, 8).map((s, i) => (
             <SongRow key={s.id} song={s} context={popular} index={i} liked={likedIds.has(s.id) ? true : undefined} />

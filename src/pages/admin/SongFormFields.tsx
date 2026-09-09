@@ -131,7 +131,7 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
           required
         />
         {audioHint && <p className="mt-1.5 rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{audioHint}</p>}
-        {audioInfo && <p className="mt-1.5 rounded-lg bg-aqua/10 px-3 py-2 text-xs text-aqua">{audioInfo}</p>}
+        {audioInfo && <p className="mt-1.5 rounded-lg bg-flame/10 px-3 py-2 text-xs text-flame">{audioInfo}</p>}
         <p className="mt-1.5 text-xs text-white/40">Paste a direct audio file URL or a MEGA file/folder link (folder links play the first audio file found). Only use sources you have the right to stream.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -145,7 +145,7 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
         </div>
       </div>
       <label htmlFor="sf-feat" className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-abyss px-4 py-3 text-sm">
-        <input id="sf-feat" type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} className="h-4 w-4 accent-[#7c5cff]" />
+        <input id="sf-feat" type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} className="h-4 w-4 accent-[#e8262f]" />
         <span><span className="font-semibold">Featured song</span><span className="block text-xs text-white/50">Show in the Featured section on Home</span></span>
       </label>
       <button

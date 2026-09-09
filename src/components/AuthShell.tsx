@@ -6,12 +6,12 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden lg:block" aria-hidden>
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1a1440] via-[#0e0e1e] to-[#04222b]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2b0d10] via-[#14090b] to-[#1a0d05]" />
         <div className="absolute -left-20 top-1/4 h-96 w-96 rounded-full bg-primary/30 blur-[120px]" />
-        <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-aqua/20 blur-[120px]" />
+        <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-flame/20 blur-[120px]" />
         <div className="relative flex h-full flex-col justify-between p-12">
           <Link to="/" className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-aqua shadow-glow">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-flame shadow-glow">
               <AudioLines className="h-6 w-6 text-white" />
             </span>
             <span>
@@ -21,7 +21,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           </Link>
           <div>
             <h2 className="max-w-md font-display text-4xl font-extrabold leading-tight">
-              Every mood has a <span className="bg-gradient-to-r from-primary-soft to-aqua-soft bg-clip-text text-transparent">frequency</span>.
+              Every mood has a <span className="bg-gradient-to-r from-primary-soft to-flame-soft bg-clip-text text-transparent">frequency</span>.
             </h2>
             <p className="mt-4 max-w-md text-white/60">
               Stream hand-picked tracks, build playlists for every moment, and carry your sound everywhere. Original, fast, and free to start.
@@ -41,7 +41,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <div className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-md">
           <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden" aria-label="Waveora home">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-aqua">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-flame">
               <AudioLines className="h-5 w-5 text-white" />
             </span>
             <span className="font-display text-xl font-extrabold">Waveora</span>

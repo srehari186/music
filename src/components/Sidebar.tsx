@@ -54,7 +54,7 @@ export function Sidebar() {
       </nav>
       <div className="mt-auto rounded-2xl border border-line bg-panel/70 p-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-primary to-aqua font-display font-bold">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-primary to-flame font-display font-bold">
             {(profile?.display_name ?? profile?.email ?? 'W').slice(0, 1).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">

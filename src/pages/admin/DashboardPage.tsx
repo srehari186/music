@@ -50,7 +50,7 @@ export function AdminDashboardPage() {
   if (loading) return <LoadingScreen label="Loading dashboard…" />
 
   const cards = [
-    { label: 'Total users', value: formatCount(stats.users), icon: <Users className="h-5 w-5 text-aqua" />, grad: 'from-aqua/25 to-transparent' },
+    { label: 'Total users', value: formatCount(stats.users), icon: <Users className="h-5 w-5 text-flame" />, grad: 'from-flame/25 to-transparent' },
     { label: 'Total songs', value: formatCount(stats.songs), icon: <Music2 className="h-5 w-5 text-primary-soft" />, grad: 'from-primary/25 to-transparent' },
     { label: 'Total playlists', value: formatCount(stats.playlists), icon: <ListMusic className="h-5 w-5 text-ember" />, grad: 'from-ember/20 to-transparent' },
     { label: 'Total plays', value: formatCount(stats.plays), icon: <Play className="h-5 w-5 text-rose" />, grad: 'from-rose/20 to-transparent' }
@@ -92,7 +92,7 @@ export function AdminDashboardPage() {
                   <span className="text-xs text-white/50">{formatCount(s.play_count)} plays</span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/8 bg-white/5">
-                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-aqua" style={{ width: `${((s.play_count ?? 0) / maxPlays) * 100}%` }} />
+                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-flame" style={{ width: `${((s.play_count ?? 0) / maxPlays) * 100}%` }} />
                 </div>
               </div>
             ))}
@@ -102,7 +102,7 @@ export function AdminDashboardPage() {
         <section className="rounded-2xl border border-line bg-panel/70 p-5" aria-label="Recently added songs">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-bold">Recently added</h2>
-            <Link to="/admin/songs" className="text-xs font-semibold text-aqua hover:text-aqua-soft">Manage →</Link>
+            <Link to="/admin/songs" className="text-xs font-semibold text-flame hover:text-flame-soft">Manage →</Link>
           </div>
           <ul className="mt-4 space-y-2 text-sm">
             {latest.map((s) => (

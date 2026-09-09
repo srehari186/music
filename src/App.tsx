@@ -47,7 +47,7 @@ export default function App() {
           <Toaster
             position="top-center"
             toastOptions={{
-              style: { background: '#141428', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }
+              style: { background: '#1f0c0e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }
             }}
           />
           <Routes>

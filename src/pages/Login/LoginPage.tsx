@@ -94,7 +94,7 @@ export function LoginPage() {
         <Link to="/forgot-password" className="text-white/60 hover:text-white focus-ring rounded">
           Forgot password?
         </Link>
-        <Link to="/signup" className="font-semibold text-aqua hover:text-aqua-soft focus-ring rounded">
+        <Link to="/signup" className="font-semibold text-flame hover:text-flame-soft focus-ring rounded">
           Create account
         </Link>
       </div>

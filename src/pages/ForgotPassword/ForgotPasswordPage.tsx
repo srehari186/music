@@ -35,12 +35,12 @@ export function ForgotPasswordPage() {
   return (
     <AuthShell title="Reset password" subtitle="Enter your email and we'll send you a reset link.">
       {sent ? (
-        <div className="rounded-2xl border border-aqua/30 bg-aqua/10 p-5 text-sm">
+        <div className="rounded-2xl border border-flame/30 bg-flame/10 p-5 text-sm">
           <p className="font-semibold">Check your inbox</p>
           <p className="mt-1 text-white/70">
             If an account exists for <span className="text-white">{email}</span>, a password reset link is on its way.
           </p>
-          <Link to="/login" className="mt-4 inline-block font-semibold text-aqua hover:text-aqua-soft">
+          <Link to="/login" className="mt-4 inline-block font-semibold text-flame hover:text-flame-soft">
             Back to login
           </Link>
         </div>

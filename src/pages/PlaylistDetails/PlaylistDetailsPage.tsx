@@ -55,11 +55,11 @@ export function PlaylistDetailsPage() {
   return (
     <div className="space-y-6">
       <div className="glass flex flex-col gap-4 rounded-3xl p-6 sm:flex-row sm:items-center">
-        <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-aqua shadow-glow">
+        <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-flame shadow-glow">
           <ListMusic className="h-10 w-10 text-white" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aqua">Playlist</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-flame">Playlist</p>
           <h1 className="truncate font-display text-3xl font-extrabold tracking-tight">{name}</h1>
           {desc && <p className="mt-1 text-sm text-white/55">{desc}</p>}
           <p className="mt-1 text-xs text-white/40">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</p>

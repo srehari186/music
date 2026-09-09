@@ -57,7 +57,7 @@ export function ProfilePage() {
         {avatarUrl ? (
           <img src={avatarUrl} alt="Profile avatar" className="h-16 w-16 rounded-2xl object-cover" />
         ) : (
-          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary to-aqua font-display text-2xl font-extrabold">
+          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary to-flame font-display text-2xl font-extrabold">
             {(displayName || profile?.email || 'W').slice(0, 1).toUpperCase()}
           </span>
         )}
@@ -65,7 +65,7 @@ export function ProfilePage() {
           <p className="truncate font-display text-xl font-bold">{displayName || 'Music lover'}</p>
           <p className="truncate text-sm text-white/55">{profile?.email}</p>
           <p className="mt-1 text-xs text-white/40">
-            Member since {formatRelativeTime(profile?.created_at)} • Role: <span className="font-semibold text-aqua">{profile?.role}</span>
+            Member since {formatRelativeTime(profile?.created_at)} • Role: <span className="font-semibold text-flame">{profile?.role}</span>
           </p>
         </div>
       </div>

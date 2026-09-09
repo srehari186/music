@@ -35,7 +35,7 @@ export function SongRow({ song, context, liked, index, showAlbum = true, trailin
         className="h-11 w-11 shrink-0 rounded-lg object-cover"
       />
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-sm font-medium ${isCurrent ? 'text-aqua' : ''}`}>{song.title}</p>
+        <p className={`truncate text-sm font-medium ${isCurrent ? 'text-flame' : ''}`}>{song.title}</p>
         <p className="truncate text-xs text-white/55">
           {song.artist ?? 'Unknown'} {showAlbum && song.album ? `• ${song.album}` : ''}
         </p>

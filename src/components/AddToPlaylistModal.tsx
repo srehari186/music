@@ -38,7 +38,7 @@ export function AddToPlaylistModal({
       <div className="glass w-full max-w-sm rounded-2xl p-5 shadow-card">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display font-bold">
-            <ListPlus className="h-5 w-5 text-aqua" /> Add to playlist
+            <ListPlus className="h-5 w-5 text-flame" /> Add to playlist
           </h2>
           <button onClick={onClose} aria-label="Close" className="rounded p-1.5 text-white/60 hover:text-white focus-ring">
             <X className="h-4 w-4" />
@@ -58,7 +58,7 @@ export function AddToPlaylistModal({
                   disabled={busyId === pl.id}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/5 focus-ring disabled:opacity-60"
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/50 to-aqua/40">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/50 to-flame/40">
                     <Plus className="h-4 w-4" />
                   </span>
                   <span className="flex-1 truncate font-medium">{pl.name}</span>
