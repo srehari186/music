@@ -1,5 +1,3 @@
-import type { Song } from '../types/database'
-
 export function formatTime(totalSeconds: number | null | undefined): string {
   if (totalSeconds == null || !isFinite(totalSeconds) || totalSeconds < 0) return '0:00'
   const s = Math.floor(totalSeconds)
@@ -91,43 +89,4 @@ export function coverFallback(title: string, artist?: string | null): string {
   const seed = encodeURIComponent(`${title}-${artist ?? 'waveora'}`)
   // Deterministic gradient placeholder (no external copyrighted art)
   return `https://api.dicebear.com/9.x/shapes/svg?seed=${seed}&backgroundColor=2c1114,1f0c0e`
-}
-
-export interface AlbumGroup {
-  key: string
-  name: string
-  artist: string | null
-  cover: string | null
-  /** Tracks in album order (oldest first). */
-  songs: Song[]
-  /** ISO timestamp of the newest track — used to order albums. */
-  latest: string
-}
-
-/**
- * Group songs sharing an `album` (as set by the MEGA folder import) into
- * albums; songs without an album come back as singles.
- */
-export function groupSongsByAlbum(songs: Song[]): { albums: AlbumGroup[]; singles: Song[] } {
-  const map = new Map<string, AlbumGroup>()
-  const singles: Song[] = []
-  const newestFirst = [...songs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-  for (const s of newestFirst) {
-    const name = s.album?.trim()
-    if (!name) {
-      singles.push(s)
-      continue
-    }
-    const key = `${(s.artist ?? '').trim().toLowerCase()}|||${name.toLowerCase()}`
-    let g = map.get(key)
-    if (!g) {
-      g = { key, name, artist: s.artist, cover: s.cover_url, songs: [], latest: s.created_at }
-      map.set(key, g)
-    }
-    g.songs.push(s)
-    if (!g.cover && s.cover_url) g.cover = s.cover_url
-  }
-  for (const g of map.values()) g.songs.reverse()
-  const albums = [...map.values()].sort((a, b) => +new Date(b.latest) - +new Date(a.latest))
-  return { albums, singles }
 }

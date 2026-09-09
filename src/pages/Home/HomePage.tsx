@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Clock3, Flame, Sparkles, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { Song } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMusicPlayer } from '../../contexts/MusicPlayerContext'
 import { SongCard } from '../../components/SongCard'
-import { AlbumCard } from '../../components/AlbumCard'
 import { SongRow } from '../../components/SongRow'
 import { SkeletonCards, LoadingScreen } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
 import { AddToPlaylistModal } from '../../components/AddToPlaylistModal'
 import { fetchFeaturedSongs, fetchPopularSongs, fetchRecentSongs, fetchRecentlyPlayed, getLikedSongIds } from '../../services/songService'
 import { fetchPlaylists } from '../../services/playlistService'
-import { formatRelativeTime, friendlyError, groupSongsByAlbum } from '../../utils'
+import { formatRelativeTime, friendlyError } from '../../utils'
 import type { Playlist } from '../../types/database'
 
 function SectionHead({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
@@ -45,7 +44,7 @@ export function HomePage() {
     setLoading(true)
     try {
       const [r, f, p, h, liked, pls] = await Promise.all([
-        fetchRecentSongs(30),
+        fetchRecentSongs(10),
         fetchFeaturedSongs(10),
         fetchPopularSongs(10),
         fetchRecentlyPlayed(user.id, 8),
@@ -81,6 +80,10 @@ export function HomePage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
+  const recommended = [...featured, ...popular].filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i).slice(0, 10)
+  const q = query.trim().toLowerCase()
+  const filterFn = (s: Song) => !q || `${s.title} ${s.artist ?? ''} ${s.album ?? ''}`.toLowerCase().includes(q)
+
   if (loading) {
     return (
       <div className="space-y-10">
@@ -93,18 +96,6 @@ export function HomePage() {
       </div>
     )
   }
-
-  const recommended = [...featured, ...popular].filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i).slice(0, 10)
-  const q = query.trim().toLowerCase()
-  const filterFn = (s: Song) => !q || `${s.title} ${s.artist ?? ''} ${s.album ?? ''}`.toLowerCase().includes(q)
-
-  // Recently added is presented as albums: songs sharing an album land in
-  // one album card (newest album first); loose tracks show as singles.
-  const { albums: recentAlbums, singles: recentSingles } = useMemo(() => groupSongsByAlbum(recent), [recent])
-  const shownAlbums = recentAlbums
-    .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
-    .slice(0, 10)
-  const shownSingles = recentSingles.filter(filterFn).slice(0, 10)
 
   return (
     <div className="space-y-10">
@@ -140,17 +131,12 @@ export function HomePage() {
       )}
 
       <section aria-label="Recently added">
-        <SectionHead icon={<Sparkles className="h-5 w-5 text-ember" />} title="Recently added" subtitle="Fresh albums and singles on Waveora" />
-        {shownAlbums.length === 0 && shownSingles.length === 0 ? (
+        <SectionHead icon={<Sparkles className="h-5 w-5 text-ember" />} title="Recently added" subtitle="The latest drops on Waveora" />
+        {recent.filter(filterFn).length === 0 ? (
           <EmptyState message={recent.length === 0 ? 'No songs yet. Ask an admin to add music.' : 'No results found.'} />
         ) : (
           <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-            {shownAlbums.map((a) => (
-              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
-                <AlbumCard album={a} />
-              </div>
-            ))}
-            {shownSingles.map((s) => (
+            {recent.filter(filterFn).map((s) => (
               <div key={s.id} className="w-44 shrink-0 snap-start md:w-auto">
                 <SongCard song={s} context={recent} liked={likedIds.has(s.id)} onToggleLike={toggleLikeLocal} onAddToPlaylist={setModalSong} />
               </div>
