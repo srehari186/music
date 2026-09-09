@@ -136,9 +136,12 @@ create or replace function public.prevent_role_escalation()
 returns trigger as $$
 begin
   if new.role is distinct from old.role then
-    -- Allow only admins (checked via JWT-less lookup of the actor's profile)
-    -- to change roles. Actor = auth.uid().
-    if not exists (
+    -- Allow role changes from the Supabase dashboard / SQL editor / service_role,
+    -- where there is no app JWT (auth.uid() is null). That path is only reachable
+    -- by project owners holding secret keys, so it is safe — and it is how the
+    -- very first admin gets created.
+    -- Block only authenticated app users who are not admins.
+    if auth.uid() is not null and not exists (
       select 1 from public.profiles p
       where p.id = auth.uid() and p.role = 'admin'
     ) then

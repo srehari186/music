@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { SongInput } from '../../services/songService'
-import { classifyAudioUrl } from '../../utils'
+import { classifyAudioUrl, isMegaUrl } from '../../utils'
 
 interface Props {
   initial?: Partial<SongInput>
@@ -24,6 +24,26 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
   const [featured, setFeatured] = useState(Boolean(initial?.featured))
   const [error, setError] = useState<string | null>(null)
   const [audioHint, setAudioHint] = useState<string | null>(null)
+  const [audioInfo, setAudioInfo] = useState<string | null>(() =>
+    initial?.audio_url && isMegaUrl(initial.audio_url)
+      ? 'MEGA link detected — it will be decrypted and streamed in the listener’s browser.'
+      : null
+  )
+
+  const refreshAudioHints = (value: string) => {
+    if (!value.trim()) {
+      setAudioHint(null)
+      setAudioInfo(null)
+      return
+    }
+    const c = classifyAudioUrl(value)
+    setAudioHint(c.warning ?? null)
+    setAudioInfo(
+      isMegaUrl(value)
+        ? 'MEGA link detected — it will be decrypted and streamed in the listener’s browser.'
+        : null
+    )
+  }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,17 +124,15 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
           value={audioUrl}
           onChange={(e) => {
             setAudioUrl(e.target.value)
-            if (e.target.value.trim()) {
-              const c = classifyAudioUrl(e.target.value)
-              setAudioHint(c.warning ?? null)
-            } else setAudioHint(null)
+            refreshAudioHints(e.target.value)
           }}
-          placeholder="https://example.com/song.mp3"
+          placeholder="https://example.com/song.mp3 or https://mega.nz/file/…#key…"
           className={inputCls}
           required
         />
         {audioHint && <p className="mt-1.5 rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{audioHint}</p>}
-        <p className="mt-1.5 text-xs text-white/40">Must be a direct, browser-streamable audio file. Only use URLs you have rights to stream.</p>
+        {audioInfo && <p className="mt-1.5 rounded-lg bg-aqua/10 px-3 py-2 text-xs text-aqua">{audioInfo}</p>}
+        <p className="mt-1.5 text-xs text-white/40">Paste a direct audio file URL or a MEGA file/folder link (folder links play the first audio file found). Only use sources you have the right to stream.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

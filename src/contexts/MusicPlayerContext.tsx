@@ -4,7 +4,8 @@ import type { Song } from '../types/database'
 import { createAudioProvider, type AudioProvider } from '../services/audioService'
 import { incrementPlayCount, recordRecentlyPlayed } from '../services/songService'
 import { supabase } from '../lib/supabase'
-import { PLAYBACK_ERROR_MESSAGE } from '../utils'
+import { PLAYBACK_ERROR_MESSAGE, isMegaUrl } from '../utils'
+import { MegaCancelledError, resolveAudioSource } from '../services/megaService'
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
@@ -21,6 +22,10 @@ interface PlayerState {
   shuffle: boolean
   repeat: RepeatMode
   playbackError: string | null
+  /** 0..1 while a MEGA link is being fetched/decrypted, else null */
+  loadProgress: number | null
+  /** Human-readable fetch status (e.g. "Fetching from MEGA… 42%"), else null */
+  loadDetail: string | null
   playSongs: (songs: Song[], startIndex?: number) => void
   playSong: (song: Song, context?: Song[]) => void
   togglePlay: () => void
@@ -48,9 +53,13 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [shuffle, setShuffle] = useState(false)
   const [repeat, setRepeat] = useState<RepeatMode>('off')
   const [playbackError, setPlaybackError] = useState<string | null>(null)
+  const [loadProgress, setLoadProgress] = useState<number | null>(null)
+  const [loadDetail, setLoadDetail] = useState<string | null>(null)
 
   const providerRef = useRef<AudioProvider | null>(null)
   const countedForRef = useRef<string | null>(null)
+  const resolveGen = useRef(0)
+  const cancelInflight = useRef<(() => void) | null>(null)
   const shuffleRef = useRef(shuffle)
   const repeatRef = useRef(repeat)
   shuffleRef.current = shuffle
@@ -98,6 +107,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       el.removeEventListener('ended', onEnded)
       provider.dispose()
       providerRef.current = null
+      resolveGen.current++
+      cancelInflight.current?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -117,13 +128,44 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const loadAndPlay = useCallback(async (song: Song) => {
     const provider = providerRef.current
     if (!provider) return
+    // Invalidate any in-flight source resolution (e.g. a MEGA fetch) so a
+    // stale download can never hijack the newly requested song.
+    const gen = ++resolveGen.current
+    cancelInflight.current?.()
+    let cancelled = false
+    cancelInflight.current = () => {
+      cancelled = true
+    }
+    const isStale = () => cancelled || resolveGen.current !== gen
+
     countedForRef.current = null
     setPlaybackError(null)
     setIsLoading(true)
     setCurrentTime(0)
     setDuration(song.duration ?? 0)
+    const needsMega = isMegaUrl(song.audio_url)
+    setLoadProgress(needsMega ? 0 : null)
+    setLoadDetail(needsMega ? 'Connecting to MEGA…' : null)
     try {
-      provider.load(song.audio_url)
+      // MEGA share links are decrypted in-browser to a blob URL first;
+      // direct audio URLs pass through untouched.
+      const src = await resolveAudioSource(
+        song.audio_url,
+        (p) => {
+          if (isStale()) return
+          setLoadProgress(p.ratio)
+          setLoadDetail(
+            p.ratio != null
+              ? `Fetching from MEGA… ${Math.round(p.ratio * 100)}%`
+              : 'Fetching from MEGA…'
+          )
+        },
+        { cancelled: isStale }
+      )
+      if (isStale()) return
+      setLoadProgress(null)
+      setLoadDetail(null)
+      provider.load(src)
       await provider.play()
       // Count a play only after playback actually started (threshold met)
       if (countedForRef.current !== song.id) {
@@ -132,11 +174,15 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         const { data } = await supabase.auth.getUser()
         if (data.user) void recordRecentlyPlayed(data.user.id, song.id)
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof MegaCancelledError || isStale()) return
       setIsLoading(false)
       setIsPlaying(false)
-      setPlaybackError(PLAYBACK_ERROR_MESSAGE)
-      toast.error(PLAYBACK_ERROR_MESSAGE)
+      setLoadProgress(null)
+      setLoadDetail(null)
+      const message = e instanceof Error ? e.message : PLAYBACK_ERROR_MESSAGE
+      setPlaybackError(message)
+      toast.error(message)
     }
   }, [])
 
@@ -259,6 +305,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       shuffle,
       repeat,
       playbackError,
+      loadProgress,
+      loadDetail,
       playSongs,
       playSong,
       togglePlay,
@@ -271,7 +319,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       cycleRepeat,
       clearError
     }),
-    [currentSong, queue, queueIndex, isPlaying, isLoading, currentTime, duration, volume, muted, shuffle, repeat, playbackError, playSongs, playSong, togglePlay, next, previous, seek, setVolume, toggleMute, toggleShuffle, cycleRepeat, clearError]
+    [currentSong, queue, queueIndex, isPlaying, isLoading, currentTime, duration, volume, muted, shuffle, repeat, playbackError, loadProgress, loadDetail, playSongs, playSong, togglePlay, next, previous, seek, setVolume, toggleMute, toggleShuffle, cycleRepeat, clearError]
   )
 
   return <MusicPlayerContext.Provider value={value}>{children}</MusicPlayerContext.Provider>

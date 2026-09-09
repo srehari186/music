@@ -72,6 +72,28 @@ export function AudioPlayer() {
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-abyss/92 backdrop-blur-xl md:bottom-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {/* MEGA fetch / decrypt progress */}
+        {p.isLoading && p.loadDetail && (
+          <div className="px-3 pt-2 md:px-6" role="status" aria-live="polite">
+            <div className="mx-auto flex max-w-7xl items-center gap-3">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-aqua" aria-hidden />
+              <p className="flex-1 truncate text-[11px] font-medium text-aqua">{p.loadDetail}</p>
+              {p.loadProgress != null && (
+                <span className="text-[11px] tabular-nums text-white/60">{Math.round(p.loadProgress * 100)}%</span>
+              )}
+            </div>
+            <div className="mx-auto mt-1.5 h-1 max-w-7xl overflow-hidden rounded-full bg-white/10">
+              {p.loadProgress != null ? (
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-aqua transition-[width]"
+                  style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
+                />
+              ) : (
+                <div className="skeleton h-full w-full" aria-hidden />
+              )}
+            </div>
+          </div>
+        )}
         {/* progress */}
         <div className="group relative h-1 w-full bg-white/10" role="presentation">
           <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-aqua" style={{ width: `${progress}%` }} />

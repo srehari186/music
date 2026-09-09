@@ -48,9 +48,18 @@ export function friendlyError(err: unknown, fallback = 'Something went wrong. Pl
 export const PLAYBACK_ERROR_MESSAGE =
   'Playback could not be started. This audio source may not support browser streaming. Please try another source.'
 
+export function isMegaUrl(url: string): boolean {
+  try {
+    const h = new URL(url.trim()).hostname.toLowerCase()
+    return h === 'mega.nz' || h === 'mega.co.nz' || h.endsWith('.mega.nz') || h.endsWith('.mega.co.nz')
+  } catch {
+    return false
+  }
+}
+
 /**
- * Returns true only for URLs the browser can plausibly stream via HTMLAudio.
- * Normal MEGA share pages (mega.nz/...) are NOT direct streams, so we warn.
+ * MEGA share links are streamable: Waveora resolves them in the browser
+ * (public API + client-side decrypt) before handing audio to the player.
  */
 export function classifyAudioUrl(url: string): { playable: boolean; warning?: string } {
   const trimmed = url.trim()
@@ -61,19 +70,17 @@ export function classifyAudioUrl(url: string): { playable: boolean; warning?: st
   } catch {
     return { playable: false, warning: 'That does not look like a valid URL.' }
   }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { playable: false, warning: 'Audio URL must use http(s).' }
-  }
-  if (parsed.hostname.includes('mega.nz') || parsed.hostname.includes('mega.co.nz')) {
-    // Only allow it if it is clearly a direct file (rare). Otherwise flag.
-    const looksDirect = /\.(mp3|ogg|wav|m4a|flac|opus|webm)(\?|#|$)/i.test(trimmed)
-    if (!looksDirect) {
+  if (isMegaUrl(trimmed)) {
+    if (!trimmed.includes('#')) {
       return {
-        playable: true,
-        warning:
-          'This looks like a MEGA share page, which is not a browser-streamable audio file. Paste a direct audio file URL (https://…/song.mp3) instead.'
+        playable: false,
+        warning: 'This MEGA link is missing its decryption key (the part after #). Copy the full share link.'
       }
     }
+    return { playable: true }
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { playable: false, warning: 'Audio URL must use http(s), or be a MEGA share link.' }
   }
   return { playable: true }
 }

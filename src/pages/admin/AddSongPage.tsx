@@ -34,7 +34,7 @@ export function AddSongPage() {
       <div>
         <Link to="/admin/songs" className="text-sm text-white/55 hover:text-white">← Back to songs</Link>
         <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight">Add song</h1>
-        <p className="mt-1 text-sm text-white/55">Paste a browser-compatible audio URL (e.g. https://…/song.mp3). MEGA share pages are not playable directly.</p>
+        <p className="mt-1 text-sm text-white/55">Paste a browser-compatible audio URL (e.g. https://…/song.mp3) or a MEGA file/folder link — MEGA links are decrypted and streamed in the listener’s browser.</p>
       </div>
       <SongFormFields busy={busy} busyLabel="Adding…" submitLabel="Add song" onSubmit={onSubmit} extraSpinner={<ButtonSpinner />} />
     </div>

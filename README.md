@@ -54,6 +54,8 @@ No credentials in code — ever.
 
 To promote further admins, an existing admin runs the same SQL (regular users are blocked from changing `role` by trigger + RLS).
 
+> If you deployed the schema before this fix and get `Only admins can change roles` in the SQL editor itself, re-run just the `prevent_role_escalation()` function block from `supabase/schema.sql`, then retry the `UPDATE`.
+
 ## Environment variables
 
 ```bash
@@ -97,9 +99,18 @@ npm run preview  # preview dist/
 
 ## Audio URL requirements
 
-- `audio_url` must be a **direct, browser-streamable file** (e.g. `https://cdn.example.com/song.mp3`) served with CORS/`Accept-Ranges` friendly headers.
-- A normal **MEGA share page** (`mega.nz/...`) is a web page, not an audio file — it will **not** play in `<audio>`. The app detects MEGA-looking URLs and warns; playback failures show a friendly toast instead of hanging.
-- Never bypass DRM/auth/paywalls or auto-download from third parties. Only stream URLs you have the legal right to use. The `audioService` is swappable so Supabase Storage signed URLs or HLS can be added later.
+Two kinds of sources are supported:
+
+1. **Direct audio files** (e.g. `https://cdn.example.com/song.mp3`) served with browser-friendly headers — these play instantly.
+2. **MEGA share links** (`https://mega.nz/file/…#key…`, legacy `/#!…` links, and folder links). A MEGA link is not an audio file — it is an encrypted file ID + key — so Waveora resolves it **entirely in the listener's browser** (`src/services/megaService.ts`, via the fetch-based `megajs` SDK loaded on demand):
+   - fetches file metadata from MEGA's public API,
+   - downloads the ciphertext in chunks with a `Fetching from MEGA… %` progress indicator in the player,
+   - decrypts it client-side (AES-128-CTR) and plays it as a Blob URL (cached in memory for the session, so replays are instant).
+   - Folder links play the embedded/first audio file found (mp3, m4a, ogg, wav, flac, opus, webm…).
+   - The link **must include the key** (the part after `#`); keyless links are rejected with a friendly message, as are deleted/private/rate-limited files.
+
+- Never bypass DRM/auth/paywalls or auto-download from third parties. Only stream URLs you have the legal right to use, and make sure you agree with MEGA's Terms of Service.
+- Troubleshooting MEGA playback: ad-blockers or strict tracking prevention can block `g.api.mega.co.nz` — whitelist the site; MEGA also rate-limits anonymous bandwidth, so very popular files may intermittently fail with "try again in a bit".
 
 ## Project structure
 
