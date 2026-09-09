@@ -45,11 +45,52 @@ interface MegaFileLike {
   directory?: boolean
   children?: MegaFileLike[]
   nodeId?: string
-  downloadId?: string
+  /** For files inside a shared folder this is [folderId, fileHandle]. */
+  downloadId?: string | string[]
   loadedFile?: string
   api: { userAgent: string | null }
   loadAttributes(): Promise<unknown>
   download(options?: Record<string, unknown>): MegaStreamLike
+}
+
+/**
+ * The node handle of a file. Children of a shared folder carry
+ * `downloadId = [folderId, fileHandle]` (no `nodeId`), so the handle is
+ * the LAST element — never the raw array.
+ */
+function extractNodeId(f: MegaFileLike): string | null {
+  if (typeof f.nodeId === 'string' && f.nodeId) return f.nodeId
+  if (Array.isArray(f.downloadId)) {
+    const last = f.downloadId[f.downloadId.length - 1]
+    return typeof last === 'string' && last ? last : null
+  }
+  if (typeof f.downloadId === 'string' && f.downloadId) return f.downloadId
+  return null
+}
+
+/**
+ * Heal per-file links stored before the node-id fix: the id segment looked
+ * like `FOLDERID,NODEHANDLE` (a stringified array). Node handles are
+ * base64url (never contain commas), so the real id is the last segment.
+ */
+export function normalizeMegaUrl(url: string): string {
+  const t = url.trim()
+  // New format: …/folder/FID#FKEY/file/<id> — <id> must be a bare handle.
+  const fileIdx = t.indexOf('/file/')
+  if (fileIdx !== -1) {
+    const head = t.slice(0, fileIdx + 6)
+    const after = t.slice(fileIdx + 6)
+    const seg = after.split('/')[0]
+    if (seg.includes(',')) {
+      const fixed = seg.split(',').pop() ?? ''
+      if (fixed) return head + fixed + after.slice(seg.length)
+    }
+    return t
+  }
+  // Legacy format: #F!FID!FKEY!FILEID — same comma problem, same fix.
+  const m = t.match(/^(https:\/\/mega\.(?:nz|co\.nz)\/#F![^!]+![^!]+![^!,/]+),([^!/,]+)(.*)$/)
+  if (m) return `${m[1].slice(0, m[1].lastIndexOf('!') + 1)}${m[2]}${m[3]}`
+  return t
 }
 
 interface MegaFileConstructor {
@@ -114,7 +155,7 @@ function pickAudioFromFolder(folder: MegaFileLike): MegaFileLike | null {
   const kids = folder.children ?? []
   if (folder.loadedFile) {
     const wanted = folder.loadedFile
-    const match = findRecursive(kids, (f) => f.nodeId === wanted || f.downloadId === wanted)
+    const match = findRecursive(kids, (f) => extractNodeId(f) === wanted)
     if (match && !match.directory) return match
   }
   return findRecursive(kids, (f) => !f.directory && !!f.name && isAudioName(f.name))
@@ -168,7 +209,7 @@ export async function resolveMegaAudio(
   onProgress?: (p: MegaProgress) => void,
   cancel?: CancelHandle
 ): Promise<{ objectUrl: string; fileName: string; size: number | null }> {
-  const key = url.trim()
+  const key = normalizeMegaUrl(url.trim())
 
   const hit = cache.get(key)
   if (hit) {
@@ -374,8 +415,9 @@ function collectAudioTracks(files: MegaFileLike[], out: MegaFolderTrack[]): void
   for (const f of sorted) {
     if (f.directory) {
       if (f.children) collectAudioTracks(f.children, out)
-    } else if (f.name && isAudioName(f.name) && (f.nodeId || f.downloadId)) {
-      out.push({ id: (f.nodeId ?? f.downloadId) as string, name: f.name, size: typeof f.size === 'number' ? f.size : null })
+    } else if (f.name && isAudioName(f.name)) {
+      const id = extractNodeId(f)
+      if (id) out.push({ id, name: f.name, size: typeof f.size === 'number' ? f.size : null })
     }
   }
 }

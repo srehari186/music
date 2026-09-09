@@ -64,18 +64,18 @@ export function PlaylistDetailsPage() {
           {desc && <p className="mt-1 text-sm text-white/55">{desc}</p>}
           <p className="mt-1 text-xs text-white/40">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => songs.length && playSongs(songs, 0)}
             disabled={songs.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 disabled:opacity-40 focus-ring"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 disabled:opacity-40 focus-ring sm:flex-none"
           >
             <Play className="h-4 w-4 fill-current" /> Play
           </button>
           <button
             onClick={shufflePlay}
             disabled={songs.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 disabled:opacity-40 focus-ring"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 disabled:opacity-40 focus-ring sm:flex-none"
           >
             <Shuffle className="h-4 w-4" /> Shuffle
           </button>

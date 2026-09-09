@@ -37,18 +37,18 @@ export function LikedSongsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass flex items-center gap-4 rounded-3xl p-6">
-        <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-rose to-primary shadow-glow">
+      <div className="glass flex flex-wrap items-center gap-4 rounded-3xl p-6">
+        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose to-primary shadow-glow">
           <Heart className="h-8 w-8 fill-current text-white" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="font-display text-3xl font-extrabold tracking-tight">Liked Songs</h1>
           <p className="mt-1 text-sm text-white/55">{songs.length} saved {songs.length === 1 ? 'song' : 'songs'}</p>
         </div>
         {songs.length > 0 && (
           <button
             onClick={() => playSongs(songs, 0)}
-            className="ml-auto rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 focus-ring"
+            className="w-full rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 focus-ring sm:w-auto"
           >
             Play all
           </button>

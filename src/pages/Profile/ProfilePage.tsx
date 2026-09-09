@@ -53,7 +53,7 @@ export function ProfilePage() {
         <p className="mt-1 text-sm text-white/55">Manage how you appear on Waveora.</p>
       </div>
 
-      <div className="glass flex items-center gap-4 rounded-3xl p-6">
+      <div className="glass flex flex-wrap items-center gap-4 rounded-3xl p-6">
         {avatarUrl ? (
           <img src={avatarUrl} alt="Profile avatar" className="h-16 w-16 rounded-2xl object-cover" />
         ) : (
