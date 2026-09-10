@@ -8,7 +8,7 @@ An original, production-ready music streaming web app inspired by modern platfor
 
 **Listeners**
 - Signup (no email confirmation), login, logout, password reset
-- Home with Recently Added (albums only) / Featured / Trending / Recommended / Recently Played
+- Home with Recently Added (albums only) / Featured / Trending / Recommended (albums only) / Recently Played
 - Album pages (`/album?name=…&artist=…`): songs imported from one folder share an album and appear as a single album card — click to see and play every song
 - Server-side search (title, artist, album, genre) — never downloads the whole table
 - Persistent bottom player: play/pause, next/prev, seek, volume, mute, shuffle, repeat (off/all/one), queue

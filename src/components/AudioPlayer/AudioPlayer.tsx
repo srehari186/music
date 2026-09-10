@@ -113,11 +113,11 @@ export function AudioPlayer() {
 
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2.5 md:gap-4 md:px-6 md:py-3">
           {/* Mobile bottom nav offset: player sits above nav on mobile */}
-          <div className="flex min-w-0 flex-1 items-center gap-3 md:max-w-xs">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:max-w-xs">
             <img
               src={song.cover_url || coverFallback(song.title, song.artist)}
               alt={`${song.title} artwork`}
-              className="h-11 w-11 shrink-0 rounded-xl object-cover md:h-14 md:w-14"
+              className="h-10 w-10 shrink-0 rounded-xl object-cover sm:h-11 sm:w-11 md:h-14 md:w-14"
             />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{song.title}</p>

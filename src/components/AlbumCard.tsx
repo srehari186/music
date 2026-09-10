@@ -46,7 +46,7 @@ export function AlbumCard({ album }: { album: AlbumGroup }) {
       <button
         onClick={handlePlay}
         aria-label={isCurrentAlbum && isPlaying ? `Pause album ${album.name}` : `Play album ${album.name}`}
-        className="absolute bottom-[4.5rem] right-3 grid h-11 w-11 place-items-center rounded-full bg-white text-black opacity-0 shadow-card transition group-hover:opacity-100 hover:scale-105 focus:opacity-100 focus-ring"
+        className="absolute bottom-[4.5rem] right-3 grid h-11 w-11 place-items-center rounded-full bg-white text-black shadow-card transition hover:scale-105 focus-ring md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
       >
         {isCurrentAlbum && isPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
       </button>

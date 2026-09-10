@@ -86,7 +86,7 @@ export function SongCard({ song, context, liked = false, onToggleLike, onAddToPl
               disabled={busy}
               aria-label={liked ? `Unlike ${song.title}` : `Like ${song.title}`}
               aria-pressed={liked}
-              className={`rounded-lg p-1.5 transition focus-ring ${liked ? 'text-rose' : 'text-white/50 hover:text-rose'}`}
+              className={`rounded-lg p-2 transition focus-ring ${liked ? 'text-rose' : 'text-white/50 hover:text-rose'}`}
             >
               <Heart className={`h-4 w-4 ${liked ? 'fill-current' : ''}`} />
             </button>
@@ -94,7 +94,7 @@ export function SongCard({ song, context, liked = false, onToggleLike, onAddToPl
               <button
                 onClick={() => onAddToPlaylist(song)}
                 aria-label={`Add ${song.title} to playlist`}
-                className="rounded-lg p-1.5 text-white/50 transition hover:text-white focus-ring"
+                className="rounded-lg p-2 text-white/50 transition hover:text-white focus-ring"
               >
                 <ListPlus className="h-4 w-4" />
               </button>

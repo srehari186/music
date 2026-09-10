@@ -95,6 +95,12 @@ export function HomePage() {
     .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
     .slice(0, 10)
 
+  // Recommended shows albums only, same as Recently Added.
+  const { albums: recommendedAlbums } = useMemo(() => groupSongsByAlbum(recommended), [recommended])
+  const shownRecommended = recommendedAlbums
+    .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
+    .slice(0, 10)
+
   if (loading) {
     return (
       <div className="space-y-10">
@@ -188,14 +194,14 @@ export function HomePage() {
       </section>
 
       <section aria-label="Recommended">
-        <SectionHead icon={<Wand2 className="h-5 w-5 text-primary-soft" />} title="Recommended for you" subtitle="A blend of featured and popular" />
-        {recommended.filter(filterFn).length === 0 ? (
-          <EmptyState message="No results found." />
+        <SectionHead icon={<Wand2 className="h-5 w-5 text-primary-soft" />} title="Recommended for you" subtitle="Albums picked for your taste" />
+        {shownRecommended.length === 0 ? (
+          <EmptyState message="No recommendations yet." />
         ) : (
           <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-            {recommended.filter(filterFn).map((s) => (
-              <div key={s.id} className="w-44 shrink-0 snap-start md:w-auto">
-                <SongCard song={s} context={recommended} liked={likedIds.has(s.id)} onToggleLike={toggleLikeLocal} onAddToPlaylist={setModalSong} />
+            {shownRecommended.map((a) => (
+              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
+                <AlbumCard album={a} />
               </div>
             ))}
           </div>

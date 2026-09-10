@@ -17,7 +17,7 @@ export function PlaylistCard({ playlist }: { playlist: Playlist }) {
             <ListMusic className="h-12 w-12 text-white/25" aria-hidden />
           </div>
         )}
-        <span className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-white text-black opacity-0 transition group-hover:opacity-100">
+        <span className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-white text-black transition md:opacity-0 md:group-hover:opacity-100">
           <Play className="ml-0.5 h-4 w-4" />
         </span>
       </div>
