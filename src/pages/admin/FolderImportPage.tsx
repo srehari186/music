@@ -11,6 +11,7 @@ import {
   suggestTrackTitle,
   type MegaFolderTrack
 } from '../../services/megaService'
+import { probeDuration } from '../../services/durationService'
 
 interface DraftTrack extends MegaFolderTrack {
   selected: boolean
@@ -36,6 +37,7 @@ export function FolderImportPage() {
   const [tracks, setTracks] = useState<DraftTrack[] | null>(null)
   const [fetching, setFetching] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importLabel, setImportLabel] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const onFetch = async (e: React.FormEvent) => {
@@ -87,26 +89,56 @@ export function FolderImportPage() {
     setImporting(true)
     setError(null)
     try {
-      const rows = selected.map((t) => ({
-        title: t.title.trim(),
-        artist: artistName,
-        album: albumName,
-        genre: genre.trim() || null,
-        description: null,
-        cover_url: coverUrl.trim() || null,
-        audio_url: buildMegaFileUrl(base, t.id),
-        duration: null,
-        release_year: year ? Number(year) || null : null,
-        featured
-      }))
+      // Read each track's real length first (MEGA tracks download once here
+      // and stay cached, so the first playback starts instantly).
+      const rows: {
+        title: string
+        artist: string
+        album: string
+        genre: string | null
+        description: null
+        cover_url: string | null
+        audio_url: string
+        duration: number | null
+        release_year: number | null
+        featured: boolean
+      }[] = []
+      for (let i = 0; i < selected.length; i++) {
+        const t = selected[i]
+        const audioUrl = buildMegaFileUrl(base, t.id)
+        setImportLabel(`Detecting length ${i + 1}/${selected.length}…`)
+        let d: number | null = null
+        try {
+          d = await probeDuration(audioUrl)
+        } catch {
+          d = null
+        }
+        rows.push({
+          title: t.title.trim(),
+          artist: artistName,
+          album: albumName,
+          genre: genre.trim() || null,
+          description: null,
+          cover_url: coverUrl.trim() || null,
+          audio_url: audioUrl,
+          duration: d,
+          release_year: year ? Number(year) || null : null,
+          featured
+        })
+      }
+      setImportLabel('Saving…')
       const { error: insertError } = await supabase.from('songs').insert(rows as never)
       if (insertError) throw insertError
-      toast.success(`Imported “${albumName}” — ${rows.length} songs`)
+      const withLength = rows.filter((r) => r.duration != null).length
+      toast.success(
+        `Imported “${albumName}” — ${rows.length} songs${withLength < rows.length ? ` (${rows.length - withLength} without detected length)` : ' with real lengths'}`
+      )
       navigate('/admin/songs', { replace: true })
     } catch (err) {
       setError(friendlyError(err, 'Could not import these songs.'))
     } finally {
       setImporting(false)
+      setImportLabel('')
     }
   }
 
@@ -236,7 +268,7 @@ export function FolderImportPage() {
             disabled={importing || selected.length === 0}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black hover:bg-white/85 disabled:opacity-40 focus-ring"
           >
-            {importing && <ButtonSpinner />} {importing ? 'Importing…' : `Import ${selected.length} ${selected.length === 1 ? 'track' : 'tracks'} as “${album.trim() || 'album'}”`}
+            {importing && <ButtonSpinner />} {importing ? importLabel || 'Importing…' : `Import ${selected.length} ${selected.length === 1 ? 'track' : 'tracks'} as “${album.trim() || 'album'}”`}
           </button>
         </section>
       )}

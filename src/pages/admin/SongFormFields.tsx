@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import type { SongInput } from '../../services/songService'
+import { probeDuration } from '../../services/durationService'
 import { classifyAudioUrl, isMegaUrl } from '../../utils'
 
 interface Props {
@@ -24,6 +26,7 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
   const [featured, setFeatured] = useState(Boolean(initial?.featured))
   const [error, setError] = useState<string | null>(null)
   const [audioHint, setAudioHint] = useState<string | null>(null)
+  const [detecting, setDetecting] = useState(false)
   const [audioInfo, setAudioInfo] = useState<string | null>(() =>
     initial?.audio_url && isMegaUrl(initial.audio_url)
       ? 'MEGA link detected — it will be decrypted and streamed in the listener’s browser.'
@@ -43,6 +46,25 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
         ? 'MEGA link detected — it will be decrypted and streamed in the listener’s browser.'
         : null
     )
+  }
+
+  const detectDuration = async () => {
+    if (!audioUrl.trim()) {
+      setError('Paste the audio URL first, then detect its length.')
+      return
+    }
+    setDetecting(true)
+    try {
+      const d = await probeDuration(audioUrl)
+      if (d && d > 0) {
+        setDuration(String(d))
+        toast.success(`Detected length: ${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}`)
+      } else {
+        toast.error('Could not detect the length — enter it manually.')
+      }
+    } finally {
+      setDetecting(false)
+    }
   }
 
   const submit = (e: React.FormEvent) => {
@@ -137,7 +159,19 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="sf-dur" className="mb-1.5 block text-sm font-medium">Duration (seconds)</label>
-          <input id="sf-dur" type="number" min={0} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="210" className={inputCls} />
+          <div className="flex gap-2">
+            <input id="sf-dur" type="number" min={0} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="210" className={inputCls} />
+            <button
+              type="button"
+              onClick={detectDuration}
+              disabled={detecting || !audioUrl.trim()}
+              className="shrink-0 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold hover:bg-white/15 disabled:opacity-40 focus-ring"
+              title="Read the real length from the audio URL"
+            >
+              {detecting ? '…' : 'Detect'}
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-white/40">Reads the real length from the audio (MEGA links are fetched first).</p>
         </div>
         <div>
           <label htmlFor="sf-year" className="mb-1.5 block text-sm font-medium">Release year</label>
