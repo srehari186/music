@@ -106,8 +106,9 @@ Two kinds of sources are supported:
 1. **Direct audio files** (e.g. `https://cdn.example.com/song.mp3`) served with browser-friendly headers — these play instantly.
 2. **MEGA share links** (`https://mega.nz/file/…#key…`, legacy `/#!…` links, and folder links). A MEGA link is not an audio file — it is an encrypted file ID + key — so Waveora resolves it **entirely in the listener's browser** (`src/services/megaService.ts`, via the fetch-based `megajs` SDK loaded on demand):
    - fetches file metadata from MEGA's public API,
-   - downloads the ciphertext in chunks with a `Fetching from MEGA… %` progress indicator in the player,
-   - decrypts it client-side (AES-128-CTR) and plays it as a Blob URL (cached in memory for the session, so replays are instant).
+   - downloads the ciphertext in chunks with a fetch indicator sweeping inside the seek bar,
+   - decrypts it client-side (AES-128-CTR) and **plays while fetching**: mp3/m4a streams progressively into the audio element via Media Source Extensions (no waiting for the full file); other formats and older browsers fall back to download-then-play automatically,
+   - completed streams become replay-instant memory-cache entries; per-song `…/file/<id>` links make every folder track individually streamable.
    - Folder links play the embedded/first audio file found (mp3, m4a, ogg, wav, flac, opus, webm…).
    - The link **must include the key** (the part after `#`); keyless links are rejected with a friendly message, as are deleted/private/rate-limited files.
 

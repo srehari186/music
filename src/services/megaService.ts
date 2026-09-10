@@ -204,19 +204,7 @@ export function megaFriendlyError(err: unknown): string {
   return 'Could not load this MEGA link. Please check the link and try again.'
 }
 
-export async function resolveMegaAudio(
-  url: string,
-  onProgress?: (p: MegaProgress) => void,
-  cancel?: CancelHandle
-): Promise<{ objectUrl: string; fileName: string; size: number | null }> {
-  const key = normalizeMegaUrl(url.trim())
-
-  const hit = cache.get(key)
-  if (hit) {
-    onProgress?.({ bytesLoaded: hit.size ?? 0, bytesTotal: hit.size, ratio: 1 })
-    return hit
-  }
-
+async function loadMegaLibrary(): Promise<{ File: MegaFileConstructor }> {
   let mega: unknown
   try {
     // Dynamic import: the MEGA SDK (~500KB) loads on demand, only when a
@@ -225,7 +213,17 @@ export async function resolveMegaAudio(
   } catch {
     throw new Error('The MEGA streamer failed to load (network). Please check your connection and try again.')
   }
-  const { File: MegaFile } = mega as unknown as { File: MegaFileConstructor }
+  return mega as unknown as { File: MegaFileConstructor }
+}
+
+interface MegaTarget {
+  fileName: string
+  total: number | null
+  target: MegaFileLike
+}
+
+async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaTarget> {
+  const { File: MegaFile } = await loadMegaLibrary()
 
   let file: MegaFileLike
   try {
@@ -263,7 +261,21 @@ export async function resolveMegaAudio(
     }
   }
 
-  const total: number | null = typeof target.size === 'number' ? target.size : null
+  return {
+    fileName: target.name ?? 'mega-audio',
+    total: typeof target.size === 'number' ? target.size : null,
+    target
+  }
+}
+
+/** Download + decrypt all chunks, emitting progress. Rejects with raw errors. */
+async function downloadChunks(
+  target: MegaFileLike,
+  total: number | null,
+  onProgress?: (p: MegaProgress) => void,
+  cancel?: CancelHandle,
+  onData?: (chunk: Uint8Array) => void
+): Promise<{ chunks: Uint8Array[]; loaded: number }> {
   const chunks: Uint8Array[] = []
   let loaded = 0
   const emit = (bytesTotal: number | null) => {
@@ -274,54 +286,56 @@ export async function resolveMegaAudio(
     })
   }
 
-  try {
-    await new Promise<void>((resolve, reject) => {
-      let stream: MegaStreamLike
-      try {
-        stream = target.download({ maxConnections: 4 })
-      } catch (e) {
-        reject(e)
-        return
-      }
-      const watchdog = setInterval(() => {
-        if (cancel?.cancelled()) {
-          clearInterval(watchdog)
-          try {
-            stream.destroy?.()
-          } catch {
-            /* ignore */
-          }
-          reject(new MegaCancelledError())
+  await new Promise<void>((resolve, reject) => {
+    let stream: MegaStreamLike
+    try {
+      stream = target.download({ maxConnections: 4 })
+    } catch (e) {
+      reject(e)
+      return
+    }
+    const watchdog = setInterval(() => {
+      if (cancel?.cancelled()) {
+        clearInterval(watchdog)
+        try {
+          stream.destroy?.()
+        } catch {
+          /* ignore */
         }
-      }, 200)
-      const done = (fn: () => void) => () => {
-        clearInterval(watchdog)
-        fn()
+        reject(new MegaCancelledError())
       }
-      stream.on('progress', ((info: unknown) => {
-        const p = info as { bytesLoaded?: number; bytesTotal?: number }
-        if (typeof p.bytesLoaded === 'number') loaded = p.bytesLoaded
-        emit(typeof p.bytesTotal === 'number' ? p.bytesTotal : total)
-      }) as (...args: never[]) => void)
-      stream.on('data', ((d: unknown) => {
-        const u8 = d instanceof Uint8Array ? d : new Uint8Array(d as ArrayLike<number>)
-        chunks.push(u8)
-        loaded += u8.length
-        if (loaded % 262144 < u8.length) emit(total)
-      }) as (...args: never[]) => void)
-      stream.on('end', done(() => resolve()) as (...args: never[]) => void)
-      stream.on('error', ((e: unknown) => {
-        clearInterval(watchdog)
-        reject(e instanceof Error ? e : new Error(String(e)))
-      }) as (...args: never[]) => void)
-    })
-  } catch (e) {
-    if (e instanceof MegaCancelledError) throw e
-    throw new Error(megaFriendlyError(e))
-  }
-  if (cancel?.cancelled()) throw new MegaCancelledError()
+    }, 200)
+    const done = (fn: () => void) => () => {
+      clearInterval(watchdog)
+      fn()
+    }
+    stream.on('progress', ((info: unknown) => {
+      const p = info as { bytesLoaded?: number; bytesTotal?: number }
+      if (typeof p.bytesLoaded === 'number') loaded = p.bytesLoaded
+      emit(typeof p.bytesTotal === 'number' ? p.bytesTotal : total)
+    }) as (...args: never[]) => void)
+    stream.on('data', ((d: unknown) => {
+      const u8 = d instanceof Uint8Array ? d : new Uint8Array(d as ArrayLike<number>)
+      chunks.push(u8)
+      loaded += u8.length
+      onData?.(u8)
+      if (loaded % 262144 < u8.length) emit(total)
+    }) as (...args: never[]) => void)
+    stream.on('end', done(() => resolve()) as (...args: never[]) => void)
+    stream.on('error', ((e: unknown) => {
+      clearInterval(watchdog)
+      reject(e instanceof Error ? e : new Error(String(e)))
+    }) as (...args: never[]) => void)
+  })
+  return { chunks, loaded }
+}
 
-  const fileName = target.name ?? 'mega-audio'
+function storeBlobCache(
+  key: string,
+  fileName: string,
+  total: number | null,
+  chunks: Uint8Array[]
+): { objectUrl: string; fileName: string; size: number | null } {
   // Zero-copy: Blob accepts the raw chunks as parts.
   const blob = new Blob(chunks as BlobPart[], { type: mimeFor(fileName) })
   const objectUrl = URL.createObjectURL(blob)
@@ -340,8 +354,202 @@ export async function resolveMegaAudio(
       }
     }
   }
-  emit(total)
   return entry
+}
+
+export async function resolveMegaAudio(
+  url: string,
+  onProgress?: (p: MegaProgress) => void,
+  cancel?: CancelHandle
+): Promise<{ objectUrl: string; fileName: string; size: number | null }> {
+  const key = normalizeMegaUrl(url.trim())
+
+  const hit = cache.get(key)
+  if (hit) {
+    onProgress?.({ bytesLoaded: hit.size ?? 0, bytesTotal: hit.size, ratio: 1 })
+    return hit
+  }
+
+  const { fileName, total, target } = await loadMegaTarget(key, cancel)
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+
+  let chunks: Uint8Array[]
+  try {
+    ;({ chunks } = await downloadChunks(target, total, onProgress, cancel))
+  } catch (e) {
+    if (e instanceof MegaCancelledError) throw e
+    throw new Error(megaFriendlyError(e))
+  }
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+
+  const emit = () => onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+  const entry = storeBlobCache(key, fileName, total, chunks)
+  emit()
+  return entry
+}
+
+// ---- Progressive streaming (play while fetching) ----------------------------
+
+/** MSE-compatible stream type per extension, or null (full-download fallback). */
+function mseTypeFor(fileName: string): string | null {
+  const ext = extOf(fileName)
+  if (ext === 'mp3') return 'audio/mpeg'
+  if (ext === 'm4a' || ext === 'aac') return 'audio/mp4'
+  return null
+}
+
+function mseSupported(type: string): boolean {
+  try {
+    return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
+  } catch {
+    return false
+  }
+}
+
+export interface MegaStreamSession {
+  /**
+   * Playable immediately. MSE sessions keep fetching in the background;
+   * blob sessions are already complete.
+   */
+  url: string
+  streaming: boolean
+  /** Resolves when the fetch completes (MSE: endOfStream called). */
+  done: Promise<void>
+}
+
+/**
+ * Open a MEGA song for progressive playback: decrypted chunks stream into
+ * the audio element via Media Source Extensions while the download
+ * continues, so playback starts after the first chunks instead of the
+ * whole file. Formats/browsers without MSE support fall back to
+ * download-then-play automatically.
+ */
+export async function openMegaStream(
+  url: string,
+  onProgress?: (p: MegaProgress) => void,
+  cancel?: CancelHandle
+): Promise<MegaStreamSession> {
+  const key = normalizeMegaUrl(url.trim())
+
+  const hit = cache.get(key)
+  if (hit) {
+    onProgress?.({ bytesLoaded: hit.size ?? 0, bytesTotal: hit.size, ratio: 1 })
+    return { url: hit.objectUrl, streaming: false, done: Promise.resolve() }
+  }
+
+  const { fileName, total, target } = await loadMegaTarget(key, cancel)
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+
+  const mseType = mseTypeFor(fileName)
+  if (!mseType || !mseSupported(mseType)) {
+    let chunks: Uint8Array[]
+    try {
+      ;({ chunks } = await downloadChunks(target, total, onProgress, cancel))
+    } catch (e) {
+      if (e instanceof MegaCancelledError) throw e
+      throw new Error(megaFriendlyError(e))
+    }
+    if (cancel?.cancelled()) throw new MegaCancelledError()
+    const entry = storeBlobCache(key, fileName, total, chunks)
+    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+    return { url: entry.objectUrl, streaming: false, done: Promise.resolve() }
+  }
+
+  // --- MSE path: hand the element a live stream URL right away ---
+  const ms = new MediaSource()
+  const streamUrl = URL.createObjectURL(ms)
+  let resolveDone!: () => void
+  let rejectDone!: (e: unknown) => void
+  const done = new Promise<void>((res, rej) => {
+    resolveDone = res
+    rejectDone = rej
+  })
+  let settled = false
+  const finishOk = (held: Uint8Array[]) => {
+    if (settled) return
+    settled = true
+    try {
+      if (ms.readyState === 'open') ms.endOfStream()
+    } catch {
+      /* ignore */
+    }
+    try {
+      // Completed streams become replay-instant blob cache entries.
+      storeBlobCache(key, fileName, total, held)
+    } catch {
+      /* ignore */
+    }
+    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+    resolveDone()
+  }
+  const fail = (e: unknown, reason: 'network' | 'decode' = 'network') => {
+    if (settled) return
+    settled = true
+    try {
+      if (ms.readyState === 'open') ms.endOfStream(reason)
+    } catch {
+      /* ignore */
+    }
+    rejectDone(e instanceof MegaCancelledError ? e : new Error(megaFriendlyError(e)))
+  }
+
+  const queue: Uint8Array[] = []
+  const held: Uint8Array[] = []
+  let sb: SourceBuffer | null = null
+  let downloadEnded = false
+  const pump = () => {
+    if (!sb || sb.updating) return
+    const chunk = queue.shift()
+    if (!chunk) {
+      if (downloadEnded) finishOk(held)
+      return
+    }
+    try {
+      sb.appendBuffer(chunk as unknown as ArrayBufferView<ArrayBuffer>)
+    } catch (e) {
+      fail(e, 'decode')
+    }
+  }
+
+  ms.addEventListener(
+    'sourceopen',
+    () => {
+      if (settled || cancel?.cancelled()) {
+        fail(new MegaCancelledError())
+        return
+      }
+      try {
+        sb = ms.addSourceBuffer(mseType)
+      } catch (e) {
+        fail(e, 'decode')
+        return
+      }
+      sb.addEventListener('updateend', pump)
+      sb.addEventListener('error', () => fail(new Error('decode'), 'decode'))
+      pump()
+    },
+    { once: true }
+  )
+
+  void downloadChunks(
+    target,
+    total,
+    (p) => onProgress?.(p),
+    cancel,
+    (chunk) => {
+      held.push(chunk)
+      queue.push(chunk)
+      pump()
+    }
+  ).then(
+    () => {
+      downloadEnded = true
+      pump()
+    },
+    (e) => fail(e)
+  )
+
+  return { url: streamUrl, streaming: true, done }
 }
 
 /**
