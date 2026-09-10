@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Disc3, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -18,6 +18,13 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const stripRef = useRef<HTMLDivElement | null>(null)
+
+  const scrollStrip = useCallback((dir: 1 | -1) => {
+    const el = stripRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,13 +130,37 @@ export function HomePage() {
           />
         ) : (
           <>
-            {/* Phones: every album in one swipe strip, first to last. */}
-            <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-proximity gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
-              {filtered.map((a) => (
-                <div key={a.key} className="w-[28%] shrink-0 snap-center">
-                  <AlbumCard album={a} />
-                </div>
-              ))}
+            {/* Phones: every album in one swipe strip, first to last, with
+                arrow buttons as a guaranteed fallback. */}
+            <div className="relative sm:hidden">
+              <div
+                ref={stripRef}
+                className="no-scrollbar -mx-1 flex touch-pan-x gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2"
+              >
+                {filtered.map((a) => (
+                  <div key={a.key} className="w-[28%] shrink-0">
+                    <AlbumCard album={a} />
+                  </div>
+                ))}
+              </div>
+              {filtered.length > 3 && (
+                <>
+                  <button
+                    onClick={() => scrollStrip(-1)}
+                    aria-label="Scroll albums left"
+                    className="absolute left-0 top-[35%] grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => scrollStrip(1)}
+                    aria-label="Scroll albums right"
+                    className="absolute right-0 top-[35%] grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </>
+              )}
             </div>
             <div className="hidden gap-4 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {visible.map((a) => (
