@@ -268,13 +268,14 @@ async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaT
   }
 }
 
-/** Download + decrypt all chunks, emitting progress. Rejects with raw errors. */
+/** Download + decrypt chunks (whole file or a byte range), emitting progress. Rejects with raw errors. */
 async function downloadChunks(
   target: MegaFileLike,
   total: number | null,
   onProgress?: (p: MegaProgress) => void,
   cancel?: CancelHandle,
-  onData?: (chunk: Uint8Array) => void
+  onData?: (chunk: Uint8Array) => void,
+  range?: { start: number; end: number }
 ): Promise<{ chunks: Uint8Array[]; loaded: number }> {
   const chunks: Uint8Array[] = []
   let loaded = 0
@@ -289,7 +290,11 @@ async function downloadChunks(
   await new Promise<void>((resolve, reject) => {
     let stream: MegaStreamLike
     try {
-      stream = target.download({ maxConnections: 4 })
+      // Single-connection range fetch for header sniffing; chunked parallel
+      // download for full files.
+      stream = range
+        ? target.download({ maxConnections: 1, start: range.start, end: range.end })
+        : target.download({ maxConnections: 4 })
     } catch (e) {
       reject(e)
       return
@@ -400,6 +405,499 @@ export async function resolveAudioSource(
   if (!isMegaUrl(url)) return url
   const resolved = await resolveMegaAudio(url, onProgress, cancel)
   return resolved.objectUrl
+}
+
+// ---- Duration from partial data (shows length while streaming) -------------
+
+function u32be(b: Uint8Array, o: number): number {
+  return (((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0)
+}
+
+function u32le(b: Uint8Array, o: number): number {
+  return (((b[o + 3] << 24) | (b[o + 2] << 16) | (b[o + 1] << 8) | b[o]) >>> 0)
+}
+
+function u64le(b: Uint8Array, o: number): number {
+  const lo = u32le(b, o)
+  const hi = u32le(b, o + 4)
+  return hi * 4294967296 + lo
+}
+
+function saneDuration(seconds: number): number | null {
+  if (!Number.isFinite(seconds) || seconds < 1 || seconds > 6 * 3600) return null
+  return Math.round(seconds)
+}
+
+const MP3_BITRATES: Record<string, number[]> = {
+  '1-3': [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320], // MPEG1 Layer III
+  '1-2': [32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384], // MPEG1 Layer II
+  '1-1': [32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448], // MPEG1 Layer I
+  '2-3': [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160], // MPEG2/2.5 Layer III
+  '2-2': [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160], // MPEG2/2.5 Layer II
+  '2-1': [32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256] // MPEG2/2.5 Layer I
+}
+const MP3_RATES: Record<number, number[]> = {
+  3: [44100, 48000, 32000],
+  2: [22050, 24000, 16000],
+  0: [11025, 12000, 8000]
+}
+
+/** MP3 length from ID3 TLEN, Xing/Info header, or CBR bitrate estimate. */
+export function parseMp3Duration(head: Uint8Array, totalBytes: number | null): number | null {
+  try {
+    let audioStart = 0
+    // ID3v2 tag with optional TLEN (milliseconds) frame.
+    if (head.length > 10 && head[0] === 0x49 && head[1] === 0x44 && head[2] === 0x33) {
+      const tagSize = ((head[6] & 0x7f) << 21) | ((head[7] & 0x7f) << 14) | ((head[8] & 0x7f) << 7) | (head[9] & 0x7f)
+      const major = head[3]
+      audioStart = 10 + tagSize
+      let pos = 10
+      let guard = 0
+      while (pos + 10 <= Math.min(head.length, 10 + tagSize) && guard++ < 64) {
+        const id = String.fromCharCode(head[pos], head[pos + 1], head[pos + 2], head[pos + 3])
+        if (id.charCodeAt(0) === 0) break
+        const size = major >= 4
+          ? ((head[pos + 4] & 0x7f) << 21) | ((head[pos + 5] & 0x7f) << 14) | ((head[pos + 6] & 0x7f) << 7) | (head[pos + 7] & 0x7f)
+          : u32be(head, pos + 4)
+        if (id === 'TLEN' && size > 0 && size < 16 && pos + 10 + size <= head.length) {
+          const text = String.fromCharCode(...head.slice(pos + 11, pos + 10 + size)).replace(/\D/g, '')
+          const ms = parseInt(text, 10)
+          if (ms > 0) return saneDuration(ms / 1000)
+        }
+        if (size <= 0 || size > 1 << 20) break
+        pos += 10 + size
+      }
+    }
+    // First MPEG frame header.
+    for (let i = audioStart; i + 4 < Math.min(head.length, audioStart + 8192); i++) {
+      if (head[i] !== 0xff || (head[i + 1] & 0xe0) !== 0xe0) continue
+      const ver = (head[i + 1] >> 3) & 3
+      const layer = (head[i + 1] >> 1) & 3
+      const brIdx = (head[i + 2] >> 4) & 15
+      const srIdx = (head[i + 2] >> 2) & 3
+      if (ver === 1 || layer === 0 || brIdx === 0 || brIdx === 15 || srIdx === 3) continue
+      // layer field: 3 = Layer I, 2 = Layer II, 1 = Layer III
+      const mpegGroup = ver === 3 ? '1' : '2'
+      const layerName = layer === 3 ? '1' : layer === 2 ? '2' : '3'
+      const table = MP3_BITRATES[`${mpegGroup}-${layerName}`]
+      const rates = MP3_RATES[ver]
+      if (!table || !rates) continue
+      const bitrate = table[brIdx - 1] // kbps
+      const rate = rates[srIdx]
+      // Layer I: 384 samples, Layer II: 1152, Layer III: 1152 (MPEG1) / 576.
+      const samples = layer === 3 ? 384 : layer === 2 ? 1152 : ver === 3 ? 1152 : 576
+      const mono = ((head[i + 3] >> 6) & 3) === 3
+      const sideLen = ver === 3 ? (mono ? 17 : 32) : mono ? 9 : 17
+      const xp = i + 4 + sideLen
+      if (xp + 12 <= head.length) {
+        const tag = String.fromCharCode(head[xp], head[xp + 1], head[xp + 2], head[xp + 3])
+        if ((tag === 'Xing' || tag === 'Info') && (head[xp + 7] & 1) === 1) {
+          const frames = u32be(head, xp + 8)
+          if (frames > 0) return saneDuration((frames * samples) / rate)
+        }
+      }
+      // CBR fallback from total file size.
+      if (totalBytes && totalBytes > i) {
+        return saneDuration(((totalBytes - i) * 8) / (bitrate * 1000))
+      }
+      return null
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}
+
+/** WAV length from the fmt/data chunks (exact). */
+export function parseWavDuration(head: Uint8Array): number | null {
+  try {
+    if (head.length < 16 || u32be(head, 0) !== 0x52494646 || u32be(head, 8) !== 0x57415645) return null // RIFF....WAVE
+    let pos = 12
+    let byteRate: number | null = null
+    while (pos + 8 <= head.length) {
+      const id = u32be(head, pos)
+      const size = u32le(head, pos + 4)
+      if (id === 0x666d7420 && size >= 16 && pos + 8 + 16 <= head.length) {
+        byteRate = u32le(head, pos + 8 + 8)
+      }
+      if (id === 0x64617461) {
+        if (byteRate && byteRate > 0) return saneDuration(size / byteRate)
+        return null
+      }
+      if (size > 1 << 26) break
+      pos += 8 + size + (size % 2)
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}
+
+/** FLAC length from STREAMINFO (exact). */
+export function parseFlacDuration(head: Uint8Array): number | null {
+  try {
+    if (head.length < 42 || u32be(head, 0) !== 0x664c6143) return null // fLaC
+    let pos = 4
+    let guard = 0
+    while (pos + 4 <= head.length && guard++ < 16) {
+      const type = head[pos] & 0x7f
+      const last = (head[pos] & 0x80) !== 0
+      const len = (head[pos + 1] << 16) | (head[pos + 2] << 8) | head[pos + 3]
+      if (type === 0 && len >= 34 && pos + 4 + 34 <= head.length) {
+        const d = head.slice(pos + 4, pos + 4 + 34)
+        const rate = (d[10] << 12) | (d[11] << 4) | (d[12] >> 4)
+        const total = (d[12] & 0x0f) * 4294967296 + d[13] * 16777216 + d[14] * 65536 + d[15] * 256 + d[16]
+        if (rate > 0 && total > 0) return saneDuration(total / rate)
+        return null
+      }
+      pos += 4 + len
+      if (last) break
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}
+
+/** MP4/M4A length from the mvhd box (head for faststart, tail otherwise). */
+export function parseMp4Duration(buf: Uint8Array): number | null {
+  try {
+    for (let i = 0; i + 24 <= buf.length; i++) {
+      if (buf[i] === 0x6d && buf[i + 1] === 0x76 && buf[i + 2] === 0x68 && buf[i + 3] === 0x64) {
+        const ver = buf[i + 4]
+        if (ver === 1 && i + 32 <= buf.length) {
+          const ts = u32be(buf, i + 24)
+          const hi = u32be(buf, i + 28)
+          const lo = u32be(buf, i + 32)
+          if (ts > 0) return saneDuration((hi * 4294967296 + lo) / ts)
+        } else if (ver === 0 && i + 24 <= buf.length) {
+          const ts = u32be(buf, i + 16)
+          const dur = u32be(buf, i + 20)
+          if (ts > 0 && dur > 0) return saneDuration(dur / ts)
+        }
+        return null
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}
+
+/** OGG Vorbis/Opus length: sample rate from head + granule of last page in tail. */
+export function parseOggDuration(head: Uint8Array, tail: Uint8Array | null): number | null {
+  try {
+    const findPage = (b: Uint8Array, from: number): number => {
+      for (let i = from; i + 27 <= b.length; i++) {
+        if (b[i] === 0x4f && b[i + 1] === 0x67 && b[i + 2] === 0x67 && b[i + 3] === 0x53) return i
+      }
+      return -1
+    }
+    const hp = findPage(head, 0)
+    if (hp < 0) return null
+    const segs = head[hp + 26]
+    const pkt = hp + 27 + segs
+    let rate = 0
+    let opusPreSkip = 0
+    let isOpus = false
+    if (pkt + 30 <= head.length && head[pkt] === 1 && head[pkt + 1] === 0x76) {
+      // Vorbis identification header
+      rate = u32le(head, pkt + 12)
+    } else if (pkt + 19 <= head.length && String.fromCharCode(...head.slice(pkt, pkt + 8)) === 'OpusHead') {
+      isOpus = true
+      opusPreSkip = head[pkt + 10] | (head[pkt + 11] << 8)
+      rate = u32le(head, pkt + 12) || 48000
+    } else {
+      return null
+    }
+    if (!tail || rate <= 0) return null
+    let last = -1
+    let from = 0
+    for (;;) {
+      const p = findPage(tail, from)
+      if (p < 0) break
+      last = p
+      from = p + 1
+    }
+    if (last < 0 || last + 14 > tail.length) return null
+    const granule = u64le(tail, last + 6)
+    if (granule <= 0 || granule === 0xfffffffffffff) return null
+    void isOpus
+    return saneDuration((granule - opusPreSkip) / rate)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Best-effort true length from raw file bytes (head, optional tail).
+ * Pure function — fully unit-testable without network.
+ */
+export function parseAudioDuration(
+  head: Uint8Array,
+  tail: Uint8Array | null,
+  fileName: string,
+  totalBytes: number | null
+): number | null {
+  const ext = extOf(fileName)
+  if (ext === 'mp3') return parseMp3Duration(head, totalBytes)
+  if (ext === 'wav') return parseWavDuration(head)
+  if (ext === 'flac') return parseFlacDuration(head)
+  if (ext === 'm4a' || ext === 'aac' || ext === 'mp4') {
+    return parseMp4Duration(head) ?? (tail ? parseMp4Duration(tail) : null)
+  }
+  if (ext === 'ogg' || ext === 'oga' || ext === 'opus' || ext === 'weba' || ext === 'webm') {
+    return parseOggDuration(head, tail)
+  }
+  return null
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('timeout')), ms)
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(t)
+        reject(e)
+      }
+    )
+  })
+}
+
+async function fetchRange(
+  target: MegaFileLike,
+  total: number | null,
+  start: number,
+  length: number
+): Promise<Uint8Array | null> {
+  const end = total != null ? Math.min(total - 1, start + length - 1) : start + length - 1
+  if (end < start) return null
+  try {
+    const { chunks } = await withTimeout(
+      downloadChunks(target, total, undefined, undefined, undefined, { start, end }),
+      25000
+    )
+    if (chunks.length === 0) return null
+    const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0))
+    let off = 0
+    for (const c of chunks) {
+      out.set(c, off)
+      off += c.length
+    }
+    return out
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Sniff the true length from the file's head (and tail when the container
+ * stores metadata at the end). Returns null when it can't be determined —
+ * callers then stream without a preset length.
+ */
+export async function probeStreamDuration(
+  target: MegaFileLike,
+  total: number | null,
+  fileName: string
+): Promise<number | null> {
+  try {
+    const ext = extOf(fileName)
+    const headLen = ext === 'mp3' || ext === 'm4a' || ext === 'aac' || ext === 'mp4' ? 262144 : 32768
+    const head = await fetchRange(target, total, 0, headLen)
+    if (!head) return null
+    if (ext === 'mp3' || ext === 'wav' || ext === 'flac') {
+      return parseAudioDuration(head, null, fileName, total)
+    }
+    // Containers that may keep metadata at the end: check head first.
+    const fromHead = parseAudioDuration(head, null, fileName, total)
+    if (fromHead) return fromHead
+    if (total && total > headLen + 1024) {
+      const tailLen = Math.min(total, 1048576)
+      const tail = await fetchRange(target, total, total - tailLen, tailLen)
+      if (tail) return parseAudioDuration(head, tail, fileName, total)
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// ---- Progressive streaming (play while fetching) ----------------------------
+
+/** MSE-compatible stream type per extension, or null (full-download fallback). */
+function mseTypeFor(fileName: string): string | null {
+  const ext = extOf(fileName)
+  if (ext === 'mp3') return 'audio/mpeg'
+  if (ext === 'm4a' || ext === 'aac') return 'audio/mp4'
+  return null
+}
+
+function mseSupported(type: string): boolean {
+  try {
+    return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
+  } catch {
+    return false
+  }
+}
+
+export interface MegaStreamSession {
+  /**
+   * Playable immediately. MSE sessions keep fetching in the background;
+   * blob sessions are already complete.
+   */
+  url: string
+  streaming: boolean
+  /** True length in seconds when sniffed from headers, else null. */
+  duration: number | null
+  /** Resolves when the fetch completes (MSE: endOfStream called). */
+  done: Promise<void>
+}
+
+/**
+ * Open a MEGA song for progressive playback: the true length is sniffed
+ * from headers first (shown immediately), then decrypted chunks stream
+ * into the audio element via Media Source Extensions while the download
+ * continues. Formats/browsers without MSE support fall back to
+ * download-then-play automatically.
+ */
+export async function openMegaStream(
+  url: string,
+  onProgress?: (p: MegaProgress) => void,
+  cancel?: CancelHandle
+): Promise<MegaStreamSession> {
+  const key = normalizeMegaUrl(url.trim())
+
+  const hit = cache.get(key)
+  if (hit) {
+    onProgress?.({ bytesLoaded: hit.size ?? 0, bytesTotal: hit.size, ratio: 1 })
+    return { url: hit.objectUrl, streaming: false, duration: null, done: Promise.resolve() }
+  }
+
+  const { fileName, total, target } = await loadMegaTarget(key, cancel)
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+
+  let probed: number | null = null
+  try {
+    probed = await probeStreamDuration(target, total, fileName)
+  } catch {
+    probed = null
+  }
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+
+  const mseType = mseTypeFor(fileName)
+  if (!mseType || !mseSupported(mseType)) {
+    let chunks: Uint8Array[]
+    try {
+      ;({ chunks } = await downloadChunks(target, total, onProgress, cancel))
+    } catch (e) {
+      if (e instanceof MegaCancelledError) throw e
+      throw new Error(megaFriendlyError(e))
+    }
+    if (cancel?.cancelled()) throw new MegaCancelledError()
+    const entry = storeBlobCache(key, fileName, total, chunks)
+    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+    return { url: entry.objectUrl, streaming: false, duration: probed, done: Promise.resolve() }
+  }
+
+  // --- MSE path: hand the element a live stream URL right away ---
+  const ms = new MediaSource()
+  const streamUrl = URL.createObjectURL(ms)
+  let resolveDone!: () => void
+  let rejectDone!: (e: unknown) => void
+  const done = new Promise<void>((res, rej) => {
+    resolveDone = res
+    rejectDone = rej
+  })
+  let settled = false
+  const finishOk = (held: Uint8Array[]) => {
+    if (settled) return
+    settled = true
+    try {
+      if (ms.readyState === 'open') ms.endOfStream()
+    } catch {
+      /* ignore */
+    }
+    try {
+      // Completed streams become replay-instant blob cache entries.
+      storeBlobCache(key, fileName, total, held)
+    } catch {
+      /* ignore */
+    }
+    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+    resolveDone()
+  }
+  const fail = (e: unknown, reason: 'network' | 'decode' = 'network') => {
+    if (settled) return
+    settled = true
+    try {
+      if (ms.readyState === 'open') ms.endOfStream(reason)
+    } catch {
+      /* ignore */
+    }
+    rejectDone(e instanceof MegaCancelledError ? e : new Error(megaFriendlyError(e)))
+  }
+
+  const queue: Uint8Array[] = []
+  const held: Uint8Array[] = []
+  let sb: SourceBuffer | null = null
+  let downloadEnded = false
+  const pump = () => {
+    if (!sb || sb.updating) return
+    const chunk = queue.shift()
+    if (!chunk) {
+      if (downloadEnded) finishOk(held)
+      return
+    }
+    try {
+      sb.appendBuffer(chunk as unknown as ArrayBufferView<ArrayBuffer>)
+    } catch (e) {
+      fail(e, 'decode')
+    }
+  }
+
+  ms.addEventListener(
+    'sourceopen',
+    () => {
+      if (settled || cancel?.cancelled()) {
+        fail(new MegaCancelledError())
+        return
+      }
+      try {
+        sb = ms.addSourceBuffer(mseType)
+      } catch (e) {
+        fail(e, 'decode')
+        return
+      }
+      sb.addEventListener('updateend', pump)
+      sb.addEventListener('error', () => fail(new Error('decode'), 'decode'))
+      pump()
+    },
+    { once: true }
+  )
+
+  void downloadChunks(
+    target,
+    total,
+    (p) => onProgress?.(p),
+    cancel,
+    (chunk) => {
+      held.push(chunk)
+      queue.push(chunk)
+      pump()
+    }
+  ).then(
+    () => {
+      downloadEnded = true
+      pump()
+    },
+    (e) => fail(e)
+  )
+
+  return { url: streamUrl, streaming: true, duration: probed, done }
 }
 
 // ---- MEGA folder -> album import --------------------------------------------

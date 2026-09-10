@@ -5,7 +5,7 @@ import { createAudioProvider, type AudioProvider } from '../services/audioServic
 import { incrementPlayCount, recordRecentlyPlayed } from '../services/songService'
 import { supabase } from '../lib/supabase'
 import { PLAYBACK_ERROR_MESSAGE, isMegaUrl } from '../utils'
-import { MegaCancelledError, resolveAudioSource } from '../services/megaService'
+import { MegaCancelledError, openMegaStream } from '../services/megaService'
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
@@ -85,6 +85,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const onError = () => {
       setIsLoading(false)
       setIsPlaying(false)
+      setLoadProgress(null)
+      setLoadDetail(null)
       setPlaybackError(PLAYBACK_ERROR_MESSAGE)
       toast.error(PLAYBACK_ERROR_MESSAGE)
     }
@@ -147,26 +149,57 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     setLoadProgress(needsMega ? 0 : null)
     setLoadDetail(needsMega ? 'Connecting to MEGA…' : null)
     try {
-      // MEGA share links are decrypted in-browser to a blob URL first;
-      // direct audio URLs pass through untouched.
-      const src = await resolveAudioSource(
-        song.audio_url,
-        (p) => {
-          if (isStale()) return
-          setLoadProgress(p.ratio)
-          setLoadDetail(
-            p.ratio != null
-              ? `Fetching from MEGA… ${Math.round(p.ratio * 100)}%`
-              : 'Fetching from MEGA…'
+      if (!needsMega) {
+        provider.load(song.audio_url)
+        await provider.play()
+      } else {
+        // MEGA: sniff the true length, then open a progressive stream and
+        // start playback immediately — chunks flow in while fetching
+        // continues, with the real duration shown from the start.
+        const session = await openMegaStream(
+          song.audio_url,
+          (p) => {
+            if (isStale()) return
+            setLoadProgress(p.ratio)
+            setLoadDetail(
+              p.ratio != null
+                ? `Fetching from MEGA… ${Math.round(p.ratio * 100)}%`
+                : 'Fetching from MEGA…'
+            )
+          },
+          { cancelled: isStale }
+        )
+        if (isStale()) return
+        if (session.duration && session.duration > 0) setDuration(session.duration)
+        provider.load(session.url)
+        if (!session.streaming) {
+          setLoadProgress(null)
+          setLoadDetail(null)
+          await provider.play()
+        } else {
+          // Race playback start against stream death: if the fetch dies
+          // before the first audio plays, surface the error now instead of
+          // hanging on a silent loader. Later failures surface through the
+          // element's own error handler (endOfStream('network')).
+          const never = new Promise<never>(() => {})
+          await Promise.race([provider.play(), session.done.then(() => never)])
+          // Keep the fetch indicator (and disabled seeking) until fully done.
+          void session.done.then(
+            () => {
+              if (!isStale()) {
+                setLoadProgress(null)
+                setLoadDetail(null)
+              }
+            },
+            () => {
+              if (!isStale()) {
+                setLoadProgress(null)
+                setLoadDetail(null)
+              }
+            }
           )
-        },
-        { cancelled: isStale }
-      )
-      if (isStale()) return
-      setLoadProgress(null)
-      setLoadDetail(null)
-      provider.load(src)
-      await provider.play()
+        }
+      }
       // Count a play only after playback actually started (threshold met)
       if (countedForRef.current !== song.id) {
         countedForRef.current = song.id
