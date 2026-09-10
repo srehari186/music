@@ -119,19 +119,20 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
       </header>
 
       {/* Cover + info */}
-      <main className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 overflow-y-auto px-6 py-4">
-        <img
-          src={song.cover_url || coverFallback(song.title, song.artist)}
-          alt={`${song.title} cover art`}
-          className="mx-auto aspect-square w-full max-w-[320px] rounded-3xl object-cover shadow-card sm:max-w-[360px]"
-          onError={(e) => {
-            ;(e.target as HTMLImageElement).src = coverFallback(song.title, song.artist)
-          }}
-        />
-        <div className="text-center">
-          <h1 className="truncate font-display text-2xl font-extrabold tracking-tight sm:text-3xl">{song.title}</h1>
-          <p className="mt-1 truncate text-sm text-white/60">{song.artist ?? 'Unknown artist'}</p>
-        </div>
+      <main className="relative min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-6 py-4 sm:gap-5">
+          <img
+            src={song.cover_url || coverFallback(song.title, song.artist)}
+            alt={`${song.title} cover art`}
+            className="mx-auto aspect-square w-full max-w-[280px] rounded-3xl object-cover shadow-card sm:max-w-[320px]"
+            onError={(e) => {
+              ;(e.target as HTMLImageElement).src = coverFallback(song.title, song.artist)
+            }}
+          />
+          <div className="text-center">
+            <h1 className="truncate font-display text-2xl font-extrabold tracking-tight sm:text-3xl">{song.title}</h1>
+            <p className="mt-1 truncate text-sm text-white/60">{song.artist ?? 'Unknown artist'}</p>
+          </div>
 
         {/* Progress */}
         <div>
@@ -174,32 +175,32 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-2 sm:gap-4">
+        <div className="flex items-center justify-center gap-1 sm:gap-4">
           <button
             onClick={p.toggleShuffle}
             aria-label="Toggle shuffle"
             aria-pressed={p.shuffle}
-            className={`rounded-full p-3 transition focus-ring ${p.shuffle ? 'text-flame' : 'text-white/50 hover:text-white'}`}
+            className={`rounded-full p-2 transition focus-ring sm:p-3 ${p.shuffle ? 'text-flame' : 'text-white/50 hover:text-white'}`}
           >
             <Shuffle className="h-5 w-5" />
           </button>
-          <button onClick={p.previous} aria-label="Previous song" className="rounded-full p-3 text-white/85 transition hover:text-white focus-ring">
-            <SkipBack className="h-7 w-7 fill-current" />
+          <button onClick={p.previous} aria-label="Previous song" className="rounded-full p-2 text-white/85 transition hover:text-white focus-ring sm:p-3">
+            <SkipBack className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
           </button>
           <button
             onClick={p.togglePlay}
             aria-label={p.isPlaying ? 'Pause' : 'Play'}
-            className="grid h-16 w-16 place-items-center rounded-full bg-white text-black shadow-glow transition hover:scale-105 focus-ring"
+            className="grid h-14 w-14 place-items-center rounded-full bg-white text-black shadow-glow transition hover:scale-105 focus-ring sm:h-16 sm:w-16"
           >
-            {p.isPlaying ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
+            {p.isPlaying ? <Pause className="h-6 w-6 fill-current sm:h-7 sm:w-7" /> : <Play className="ml-1 h-6 w-6 fill-current sm:h-7 sm:w-7" />}
           </button>
-          <button onClick={p.next} aria-label="Next song" className="rounded-full p-3 text-white/85 transition hover:text-white focus-ring">
-            <SkipForward className="h-7 w-7 fill-current" />
+          <button onClick={p.next} aria-label="Next song" className="rounded-full p-2 text-white/85 transition hover:text-white focus-ring sm:p-3">
+            <SkipForward className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
           </button>
           <button
             onClick={p.cycleRepeat}
             aria-label={`Repeat mode: ${p.repeat}`}
-            className={`rounded-full p-3 transition focus-ring ${p.repeat !== 'off' ? 'text-flame' : 'text-white/50 hover:text-white'}`}
+            className={`rounded-full p-2 transition focus-ring sm:p-3 ${p.repeat !== 'off' ? 'text-flame' : 'text-white/50 hover:text-white'}`}
           >
             {p.repeat === 'one' ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}
           </button>
@@ -248,6 +249,7 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
           </div>
         )}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} aria-hidden />
+        </div>
       </main>
     </div>
   )
