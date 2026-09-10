@@ -108,21 +108,24 @@ export function HomePage() {
           <div>
             <h2 className="font-display text-xl font-bold tracking-tight">Featured</h2>
             <p className="text-xs text-white/50">
-              {filtered.length} {filtered.length === 1 ? 'album' : 'albums'}
-              {totalPages > 1 && ` • Page ${safePage} of ${totalPages}`}
+              <span className="sm:hidden">{filtered.length} {filtered.length === 1 ? 'album' : 'albums'} — swipe to the last</span>
+              <span className="hidden sm:inline">
+                {filtered.length} {filtered.length === 1 ? 'album' : 'albums'}
+                {totalPages > 1 && ` • Page ${safePage} of ${totalPages}`}
+              </span>
             </p>
           </div>
         </div>
 
-        {visible.length === 0 ? (
+        {filtered.length === 0 ? (
           <EmptyState
             message={featured.length === 0 ? 'No featured albums yet. Ask an admin to feature some music.' : 'No albums found.'}
           />
         ) : (
           <>
-            {/* Phones: one big album per swipe, left to right. Tablets/desktops: grid. */}
+            {/* Phones: every album in one swipe strip, first to last. */}
             <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
-              {visible.map((a) => (
+              {filtered.map((a) => (
                 <div key={a.key} className="w-[28%] shrink-0 snap-center">
                   <AlbumCard album={a} />
                 </div>
@@ -135,7 +138,7 @@ export function HomePage() {
             </div>
 
             {totalPages > 1 && (
-              <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="Album pages">
+              <nav className="mt-6 hidden items-center justify-center gap-1.5 sm:flex" aria-label="Album pages">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage === 1}

@@ -20,6 +20,11 @@ export function SongRow({ song, context, liked, index, showAlbum = true, trailin
   const [imgOk, setImgOk] = useState(true)
   const isCurrent = currentSong?.id === song.id
 
+  const handleRowPlay = () => {
+    if (isCurrent) togglePlay()
+    else playSong(song, context)
+  }
+
   return (
     <div
       className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/5 ${
@@ -27,15 +32,28 @@ export function SongRow({ song, context, liked, index, showAlbum = true, trailin
       }`}
     >
       <span className="hidden w-6 shrink-0 text-center text-xs text-white/35 sm:block">{(index ?? 0) + 1}</span>
-      <img
-        src={imgOk ? song.cover_url || coverFallback(song.title, song.artist) : coverFallback(song.title, song.artist)}
-        alt={`${song.title} cover`}
-        loading="lazy"
-        onError={() => setImgOk(false)}
-        className="h-11 w-11 shrink-0 rounded-lg object-cover"
-      />
+      <button
+        onClick={handleRowPlay}
+        aria-label={isCurrent && isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+        className="shrink-0 rounded-lg focus-ring"
+      >
+        <img
+          src={imgOk ? song.cover_url || coverFallback(song.title, song.artist) : coverFallback(song.title, song.artist)}
+          alt=""
+          loading="lazy"
+          onError={() => setImgOk(false)}
+          className="h-11 w-11 rounded-lg object-cover"
+        />
+      </button>
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-sm font-medium ${isCurrent ? 'text-flame' : ''}`}>{song.title}</p>
+        <button
+          onClick={handleRowPlay}
+          aria-label={isCurrent && isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+          title={song.title}
+          className={`block w-full truncate text-left text-sm font-medium transition hover:text-flame focus-ring ${isCurrent ? 'text-flame' : ''}`}
+        >
+          {song.title}
+        </button>
         <p className="truncate text-xs text-white/55">
           {song.artist ?? 'Unknown'} {showAlbum && song.album ? `• ${song.album}` : ''}
         </p>

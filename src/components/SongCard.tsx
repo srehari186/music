@@ -48,15 +48,22 @@ export function SongCard({ song, context, liked = false, onToggleLike, onAddToPl
   return (
     <article className="card-hover group relative overflow-hidden rounded-2xl border border-line bg-panel/80">
       <div className="relative aspect-square overflow-hidden">
-        <img
-          src={song.cover_url || coverFallback(song.title, song.artist)}
-          alt={`${song.title} cover art`}
-          loading="lazy"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          onError={(e) => {
-            ;(e.target as HTMLImageElement).src = coverFallback(song.title, song.artist)
-          }}
-        />
+        <button
+          onClick={handlePlay}
+          aria-label={isCurrent && isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+          className="block h-full w-full cursor-pointer focus-ring"
+          title={isCurrent && isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+        >
+          <img
+            src={song.cover_url || coverFallback(song.title, song.artist)}
+            alt={`${song.title} cover art`}
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            onError={(e) => {
+              ;(e.target as HTMLImageElement).src = coverFallback(song.title, song.artist)
+            }}
+          />
+        </button>
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
         <button
           onClick={handlePlay}
@@ -72,9 +79,14 @@ export function SongCard({ song, context, liked = false, onToggleLike, onAddToPl
         )}
       </div>
       <div className="p-3">
-        <h3 className="truncate text-sm font-semibold" title={song.title}>
+        <button
+          onClick={handlePlay}
+          aria-label={isCurrent && isPlaying ? `Pause ${song.title}` : `Play ${song.title}`}
+          title={song.title}
+          className="block w-full truncate text-left text-sm font-semibold transition hover:text-flame focus-ring"
+        >
           {song.title}
-        </h3>
+        </button>
         <p className="truncate text-xs text-white/55" title={song.artist ?? ''}>
           {song.artist ?? 'Unknown artist'}
         </p>
