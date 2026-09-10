@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Disc3, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { AlbumCard } from '../../components/AlbumCard'
+import { AlbumRow } from '../../components/AlbumRow'
 import { SkeletonCards } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
 import { fetchFeaturedSongs, fetchPopularSongs } from '../../services/songService'
@@ -119,7 +120,13 @@ export function HomePage() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:grid-cols-5">
+            {/* Phones: compact rows (zoomed-out list). Tablets/desktops: cards. */}
+            <div className="rounded-2xl border border-line bg-panel/60 p-1.5 sm:hidden">
+              {visible.map((a, i) => (
+                <AlbumRow key={a.key} album={a} index={(safePage - 1) * PAGE_SIZE + i} />
+              ))}
+            </div>
+            <div className="hidden gap-4 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {visible.map((a) => (
                 <AlbumCard key={a.key} album={a} />
               ))}
@@ -184,13 +191,20 @@ export function HomePage() {
         {recommended.length === 0 ? (
           <EmptyState message="More recommendations coming soon." />
         ) : (
-          <div className="no-scrollbar -mx-1 flex touch-pan-x gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-            {recommended.map((a) => (
-              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
-                <AlbumCard album={a} />
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="rounded-2xl border border-line bg-panel/60 p-1.5 sm:hidden">
+              {recommended.map((a, i) => (
+                <AlbumRow key={a.key} album={a} index={i} />
+              ))}
+            </div>
+            <div className="no-scrollbar -mx-1 hidden gap-4 overflow-x-auto px-1 pb-2 snap-x sm:flex md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
+              {recommended.map((a) => (
+                <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
+                  <AlbumCard album={a} />
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
     </div>
