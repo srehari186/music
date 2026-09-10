@@ -134,9 +134,9 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
             <p className="mt-1 truncate text-sm text-white/60">{song.artist ?? 'Unknown artist'}</p>
           </div>
 
-        {/* Progress */}
+        {/* Progress: dim layer = fetched bytes, bright = playhead */}
         <div>
-          {fetching ? (
+          {fetching && !p.streamSeekable ? (
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
               {p.loadProgress != null ? (
                 <div
@@ -148,7 +148,12 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
               )}
             </div>
           ) : (
-            <>
+            <div className="relative">
+              {fetching && p.loadProgress != null && (
+                <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" aria-hidden>
+                  <div className="h-full rounded-full bg-white/25" style={{ width: `${Math.round(p.loadProgress * 100)}%` }} />
+                </div>
+              )}
               <label htmlFor="np-seek" className="sr-only">Seek</label>
               <input
                 id="np-seek"
@@ -156,12 +161,12 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
                 min={0}
                 max={p.duration || 0}
                 step={0.5}
-                value={p.currentTime}
+                value={Math.min(p.currentTime, p.duration || 0)}
                 onChange={(e) => p.seek(Number(e.target.value))}
-                className="wv-range w-full"
+                className="wv-range relative w-full"
                 aria-valuetext={`${formatTime(p.currentTime)} of ${formatTime(p.duration)}`}
               />
-            </>
+            </div>
           )}
           <div className="mt-1 flex justify-between text-[11px] tabular-nums text-white/50">
             <span>{formatTime(p.currentTime)}</span>

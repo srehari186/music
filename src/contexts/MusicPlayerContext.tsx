@@ -5,7 +5,7 @@ import { createAudioProvider, type AudioProvider } from '../services/audioServic
 import { incrementPlayCount, recordRecentlyPlayed } from '../services/songService'
 import { supabase } from '../lib/supabase'
 import { PLAYBACK_ERROR_MESSAGE, isMegaUrl } from '../utils'
-import { MegaCancelledError, openMegaStream } from '../services/megaService'
+import { MegaCancelledError, openMegaStream, type MegaStreamSession } from '../services/megaService'
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
@@ -26,6 +26,8 @@ interface PlayerState {
   loadProgress: number | null
   /** Human-readable fetch status (e.g. "Fetching from MEGA… 42%"), else null */
   loadDetail: string | null
+  /** True while the current stream supports seeking ahead of the buffer */
+  streamSeekable: boolean
   playSongs: (songs: Song[], startIndex?: number) => void
   playSong: (song: Song, context?: Song[]) => void
   togglePlay: () => void
@@ -55,7 +57,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [playbackError, setPlaybackError] = useState<string | null>(null)
   const [loadProgress, setLoadProgress] = useState<number | null>(null)
   const [loadDetail, setLoadDetail] = useState<string | null>(null)
-
+  const [streamSeekable, setStreamSeekable] = useState(false)
+  const sessionRef = useRef<MegaStreamSession | null>(null)
   const providerRef = useRef<AudioProvider | null>(null)
   const countedForRef = useRef<string | null>(null)
   const resolveGen = useRef(0)
@@ -109,6 +112,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       el.removeEventListener('ended', onEnded)
       provider.dispose()
       providerRef.current = null
+      sessionRef.current?.destroy?.()
+      sessionRef.current = null
       resolveGen.current++
       cancelInflight.current?.()
     }
@@ -141,6 +146,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const isStale = () => cancelled || resolveGen.current !== gen
 
     countedForRef.current = null
+    sessionRef.current?.destroy?.()
+    sessionRef.current = null
+    setStreamSeekable(false)
     setPlaybackError(null)
     setIsLoading(true)
     setCurrentTime(0)
@@ -167,9 +175,15 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
                 : 'Fetching from MEGA…'
             )
           },
-          { cancelled: isStale }
+          { cancelled: isStale },
+          song.duration ?? null
         )
-        if (isStale()) return
+        if (isStale()) {
+          session.destroy?.()
+          return
+        }
+        sessionRef.current = session
+        setStreamSeekable(!!session.seekAhead)
         if (session.duration && session.duration > 0) setDuration(session.duration)
         provider.load(session.url)
         if (!session.streaming) {
@@ -183,18 +197,23 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           // element's own error handler (endOfStream('network')).
           const never = new Promise<never>(() => {})
           await Promise.race([provider.play(), session.done.then(() => never)])
-          // Keep the fetch indicator (and disabled seeking) until fully done.
+          // Keep the fetch indicator until fully done. Seeking stays
+          // available throughout via the session when supported.
           void session.done.then(
             () => {
               if (!isStale()) {
                 setLoadProgress(null)
                 setLoadDetail(null)
+                sessionRef.current = null
+                setStreamSeekable(false)
               }
             },
             () => {
               if (!isStale()) {
                 setLoadProgress(null)
                 setLoadDetail(null)
+                sessionRef.current = null
+                setStreamSeekable(false)
               }
             }
           )
@@ -298,6 +317,41 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }, [queue, queueIndex, loadAndPlay])
 
   const seek = useCallback((seconds: number) => {
+    const session = sessionRef.current
+    const el = providerRef.current?.getElement()
+    const seekAhead = session?.streaming ? session.seekAhead : undefined
+    if (session?.streaming && seekAhead && el && seconds >= 0) {
+      // Inside the downloaded region the element seeks natively and exactly.
+      let bufferedEnd = 0
+      try {
+        for (let i = 0; i < el.buffered.length; i++) {
+          bufferedEnd = Math.max(bufferedEnd, el.buffered.end(i))
+        }
+      } catch {
+        /* ignore */
+      }
+      if (seconds <= bufferedEnd - 0.5) {
+        providerRef.current?.seek(seconds)
+        setCurrentTime(seconds)
+        return
+      }
+      // Ahead of the buffer: restart the fetch at the seek point (YouTube-style).
+      void (async () => {
+        setIsLoading(true)
+        try {
+          const ok = await seekAhead(seconds, bufferedEnd)
+          if (!ok) {
+            toast.error('Seeking will unlock when the fetch completes')
+            return
+          }
+          providerRef.current?.seek(seconds)
+          setCurrentTime(seconds)
+        } finally {
+          setIsLoading(false)
+        }
+      })()
+      return
+    }
     providerRef.current?.seek(seconds)
     setCurrentTime(seconds)
   }, [])
@@ -340,6 +394,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       playbackError,
       loadProgress,
       loadDetail,
+      streamSeekable,
       playSongs,
       playSong,
       togglePlay,
@@ -352,7 +407,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       cycleRepeat,
       clearError
     }),
-    [currentSong, queue, queueIndex, isPlaying, isLoading, currentTime, duration, volume, muted, shuffle, repeat, playbackError, loadProgress, loadDetail, playSongs, playSong, togglePlay, next, previous, seek, setVolume, toggleMute, toggleShuffle, cycleRepeat, clearError]
+    [currentSong, queue, queueIndex, isPlaying, isLoading, currentTime, duration, volume, muted, shuffle, repeat, playbackError, loadProgress, loadDetail, streamSeekable, playSongs, playSong, togglePlay, next, previous, seek, setVolume, toggleMute, toggleShuffle, cycleRepeat, clearError]
   )
 
   return <MusicPlayerContext.Provider value={value}>{children}</MusicPlayerContext.Provider>

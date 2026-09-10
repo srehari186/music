@@ -77,17 +77,18 @@ export function AudioPlayer() {
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-abyss/92 backdrop-blur-xl md:bottom-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {/* progress / fetch-loading bar */}
+        {/* progress / fetch-loading bar. While streaming, the dim layer is
+            fetched bytes (YouTube-style) and the bright layer is the playhead. */}
         <div className="group relative h-1 w-full bg-white/10" role="presentation">
           {fetching ? (
             <div className="absolute inset-0 overflow-hidden" aria-hidden>
               {p.loadProgress != null ? (
-                <div
-                  className="loading-fill h-full bg-gradient-to-r from-primary via-flame to-primary"
-                  style={{ width: `${Math.round(p.loadProgress * 100)}%` }}
-                />
+                <div className="absolute inset-y-0 left-0 bg-white/20" style={{ width: `${Math.round(p.loadProgress * 100)}%` }} />
               ) : (
                 <div className="loading-slide h-full w-1/3 bg-gradient-to-r from-transparent via-flame to-transparent" />
+              )}
+              {p.loadProgress != null && (
+                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-flame" style={{ width: `${progress}%` }} />
               )}
             </div>
           ) : (
@@ -100,11 +101,11 @@ export function AudioPlayer() {
             min={0}
             max={p.duration || 0}
             step={0.5}
-            value={p.currentTime}
+            value={Math.min(p.currentTime, p.duration || 0)}
             onChange={(e) => p.seek(Number(e.target.value))}
-            disabled={fetching}
+            disabled={fetching && !p.streamSeekable}
             className="wv-range absolute inset-x-0 -top-1.5 h-4 w-full opacity-0 transition group-hover:opacity-100 disabled:opacity-0"
-            aria-valuetext={fetching ? 'Loading audio' : `${formatTime(p.currentTime)} of ${formatTime(p.duration)}`}
+            aria-valuetext={fetching && !p.streamSeekable ? 'Loading audio' : `${formatTime(p.currentTime)} of ${formatTime(p.duration)}`}
           />
         </div>
         {fetching && (
@@ -167,7 +168,7 @@ export function AudioPlayer() {
 
           <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
             <span className="w-10 text-right text-[11px] tabular-nums text-white/50">{formatTime(p.currentTime)}</span>
-            {fetching ? (
+            {fetching && !p.streamSeekable ? (
               <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
                 {p.loadProgress != null ? (
                   <div
@@ -179,7 +180,12 @@ export function AudioPlayer() {
                 )}
               </div>
             ) : (
-              <>
+              <div className="group/seek relative flex h-4 flex-1 items-center">
+                {fetching && p.loadProgress != null && (
+                  <div className="absolute inset-x-0 h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
+                    <div className="h-full rounded-full bg-white/25" style={{ width: `${Math.round(p.loadProgress * 100)}%` }} />
+                  </div>
+                )}
                 <label htmlFor="wv-seek2" className="sr-only">Seek</label>
                 <input
                   id="wv-seek2"
@@ -187,11 +193,11 @@ export function AudioPlayer() {
                   min={0}
                   max={p.duration || 0}
                   step={0.5}
-                  value={p.currentTime}
+                  value={Math.min(p.currentTime, p.duration || 0)}
                   onChange={(e) => p.seek(Number(e.target.value))}
-                  className="wv-range w-full"
+                  className="wv-range relative w-full"
                 />
-              </>
+              </div>
             )}
             <span className="w-10 text-[11px] tabular-nums text-white/50">{formatTime(p.duration)}</span>
           </div>

@@ -39,7 +39,7 @@ interface MegaStreamLike {
   destroy?: () => void
 }
 
-interface MegaFileLike {
+export interface MegaFileLike {
   name?: string
   size?: number
   directory?: boolean
@@ -220,6 +220,7 @@ interface MegaTarget {
   fileName: string
   total: number | null
   target: MegaFileLike
+  file: MegaFileLike
 }
 
 async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaTarget> {
@@ -264,7 +265,8 @@ async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaT
   return {
     fileName: target.name ?? 'mega-audio',
     total: typeof target.size === 'number' ? target.size : null,
-    target
+    target,
+    file
   }
 }
 
@@ -335,7 +337,7 @@ async function downloadChunks(
   return { chunks, loaded }
 }
 
-function storeBlobCache(
+export function storeBlobCache(
   key: string,
   fileName: string,
   total: number | null,
@@ -652,91 +654,17 @@ export function parseAudioDuration(
   return null
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('timeout')), ms)
-    p.then(
-      (v) => {
-        clearTimeout(t)
-        resolve(v)
-      },
-      (e) => {
-        clearTimeout(t)
-        reject(e)
-      }
-    )
-  })
-}
-
-async function fetchRange(
-  target: MegaFileLike,
-  total: number | null,
-  start: number,
-  length: number
-): Promise<Uint8Array | null> {
-  const end = total != null ? Math.min(total - 1, start + length - 1) : start + length - 1
-  if (end < start) return null
-  try {
-    const { chunks } = await withTimeout(
-      downloadChunks(target, total, undefined, undefined, undefined, { start, end }),
-      25000
-    )
-    if (chunks.length === 0) return null
-    const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0))
-    let off = 0
-    for (const c of chunks) {
-      out.set(c, off)
-      off += c.length
-    }
-    return out
-  } catch {
-    return null
-  }
-}
-
-/**
- * Sniff the true length from the file's head (and tail when the container
- * stores metadata at the end). Returns null when it can't be determined —
- * callers then stream without a preset length.
- */
-export async function probeStreamDuration(
-  target: MegaFileLike,
-  total: number | null,
-  fileName: string
-): Promise<number | null> {
-  try {
-    const ext = extOf(fileName)
-    const headLen = ext === 'mp3' || ext === 'm4a' || ext === 'aac' || ext === 'mp4' ? 262144 : 32768
-    const head = await fetchRange(target, total, 0, headLen)
-    if (!head) return null
-    if (ext === 'mp3' || ext === 'wav' || ext === 'flac') {
-      return parseAudioDuration(head, null, fileName, total)
-    }
-    // Containers that may keep metadata at the end: check head first.
-    const fromHead = parseAudioDuration(head, null, fileName, total)
-    if (fromHead) return fromHead
-    if (total && total > headLen + 1024) {
-      const tailLen = Math.min(total, 1048576)
-      const tail = await fetchRange(target, total, total - tailLen, tailLen)
-      if (tail) return parseAudioDuration(head, tail, fileName, total)
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
 // ---- Progressive streaming (play while fetching) ----------------------------
 
 /** MSE-compatible stream type per extension, or null (full-download fallback). */
-function mseTypeFor(fileName: string): string | null {
+export function mseTypeFor(fileName: string): string | null {
   const ext = extOf(fileName)
   if (ext === 'mp3') return 'audio/mpeg'
   if (ext === 'm4a' || ext === 'aac') return 'audio/mp4'
   return null
 }
 
-function mseSupported(type: string): boolean {
+export function mseSupported(type: string): boolean {
   try {
     return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
   } catch {
@@ -755,6 +683,9 @@ export interface MegaStreamSession {
   duration: number | null
   /** Resolves when the fetch completes (MSE: endOfStream called). */
   done: Promise<void>
+  /** Jump to a time beyond the buffered data (YouTube-style). Absent when unsupported. */
+  seekAhead?: (time: number, bufferedEnd: number) => Promise<boolean>
+  destroy?: () => void
 }
 
 /**
@@ -767,7 +698,8 @@ export interface MegaStreamSession {
 export async function openMegaStream(
   url: string,
   onProgress?: (p: MegaProgress) => void,
-  cancel?: CancelHandle
+  cancel?: CancelHandle,
+  durationHint?: number | null
 ): Promise<MegaStreamSession> {
   const key = normalizeMegaUrl(url.trim())
 
@@ -777,127 +709,172 @@ export async function openMegaStream(
     return { url: hit.objectUrl, streaming: false, duration: null, done: Promise.resolve() }
   }
 
-  const { fileName, total, target } = await loadMegaTarget(key, cancel)
+  const { fileName, total, target, file } = await loadMegaTarget(key, cancel)
   if (cancel?.cancelled()) throw new MegaCancelledError()
 
-  let probed: number | null = null
+  // YouTube-style custom pipeline first; legacy full download on any failure.
   try {
-    probed = await probeStreamDuration(target, total, fileName)
-  } catch {
-    probed = null
+    const custom = await openCustomSession(key, fileName, total, target, file, cancel, onProgress, durationHint ?? null)
+    if (custom) return custom
+  } catch (e) {
+    if (e instanceof MegaCancelledError || cancel?.cancelled()) throw e
+    console.warn('[Waveora:MEGA] custom pipeline unavailable, using legacy fetch')
+  }
+
+  // Legacy: full download, then play (duration sniffed from the bytes).
+  let chunks: Uint8Array[]
+  try {
+    ;({ chunks } = await downloadChunks(target, total, onProgress, cancel))
+  } catch (e) {
+    if (e instanceof MegaCancelledError) throw e
+    throw new Error(megaFriendlyError(e))
   }
   if (cancel?.cancelled()) throw new MegaCancelledError()
+  const entry = storeBlobCache(key, fileName, total, chunks)
+  let legacyDuration: number | null = durationHint ?? null
+  try {
+    let headLen = 0
+    const parts: Uint8Array[] = []
+    for (const c of chunks) {
+      parts.push(c)
+      headLen += c.length
+      if (headLen >= 262144) break
+    }
+    const head = new Uint8Array(headLen)
+    let off = 0
+    for (const c of parts) {
+      head.set(c, off)
+      off += c.length
+    }
+    legacyDuration = parseAudioDuration(head, null, fileName, total) ?? durationHint ?? null
+  } catch {
+    /* keep hint */
+  }
+  onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+  return { url: entry.objectUrl, streaming: false, duration: legacyDuration, done: Promise.resolve() }
+}
 
+function needsTail(ext: string): boolean {
+  return (
+    ext === 'm4a' || ext === 'aac' || ext === 'mp4' ||
+    ext === 'ogg' || ext === 'oga' || ext === 'opus' ||
+    ext === 'weba' || ext === 'webm'
+  )
+}
+
+/**
+ * YouTube-style path: download URL via the file's own API, true length
+ * sniffed from head/tail ranges, then progressive MSE streaming with
+ * seeking. Throws when unavailable (caller falls back to legacy).
+ */
+async function openCustomSession(
+  key: string,
+  fileName: string,
+  total: number | null,
+  target: MegaFileLike,
+  file: MegaFileLike,
+  cancel: CancelHandle | undefined,
+  onProgress: ((p: MegaProgress) => void) | undefined,
+  durationHint: number | null
+): Promise<MegaStreamSession> {
+  const t = await import('./megaTransport')
+  const rawKey = (target as unknown as { key?: unknown }).key as Uint8Array | undefined
+  if (!rawKey || (rawKey as Uint8Array).length < 32) throw new Error('no key')
   const mseType = mseTypeFor(fileName)
-  if (!mseType || !mseSupported(mseType)) {
-    let chunks: Uint8Array[]
-    try {
-      ;({ chunks } = await downloadChunks(target, total, onProgress, cancel))
-    } catch (e) {
-      if (e instanceof MegaCancelledError) throw e
-      throw new Error(megaFriendlyError(e))
-    }
-    if (cancel?.cancelled()) throw new MegaCancelledError()
-    const entry = storeBlobCache(key, fileName, total, chunks)
-    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
-    return { url: entry.objectUrl, streaming: false, duration: probed, done: Promise.resolve() }
-  }
+  if (!mseType || !mseSupported(mseType)) throw new Error('no-mse')
 
-  // --- MSE path: hand the element a live stream URL right away ---
-  const ms = new MediaSource()
-  const streamUrl = URL.createObjectURL(ms)
-  let resolveDone!: () => void
-  let rejectDone!: (e: unknown) => void
-  const done = new Promise<void>((res, rej) => {
-    resolveDone = res
-    rejectDone = rej
+  const api = (file as unknown as { api?: { request?: (req: unknown, cb: (e: unknown, r: unknown) => void) => void } }).api
+  const apiRequest = api?.request
+  if (typeof apiRequest !== 'function') throw new Error('no api')
+  const fDlId = (file as unknown as { downloadId?: unknown }).downloadId
+  const tDlId = (target as unknown as { downloadId?: unknown }).downloadId
+  // Same request shape the SDK downloader uses (folder context included).
+  const req: Record<string, unknown> = { a: 'g', g: 1, ssl: 2 }
+  if (typeof fDlId === 'string' && target !== file) {
+    const handle = Array.isArray(tDlId) ? tDlId[1] : tDlId
+    if (typeof handle !== 'string' || !handle) throw new Error('no handle')
+    req._querystring = { n: fDlId }
+    req.n = handle
+  } else if (Array.isArray(tDlId)) {
+    req._querystring = { n: tDlId[0] }
+    req.n = tDlId[1]
+  } else if (typeof tDlId === 'string') {
+    req.p = tDlId
+  } else if (typeof fDlId === 'string') {
+    req.p = fDlId
+  } else {
+    throw new Error('no dl id')
+  }
+  const res = await new Promise<unknown>((resolve, reject) => {
+    try {
+      apiRequest(req, (e, r) => (e ? reject(e) : resolve(r)))
+    } catch (e) {
+      reject(e)
+    }
   })
-  let settled = false
-  const finishOk = (held: Uint8Array[]) => {
-    if (settled) return
-    settled = true
-    try {
-      if (ms.readyState === 'open') ms.endOfStream()
-    } catch {
-      /* ignore */
-    }
-    try {
-      // Completed streams become replay-instant blob cache entries.
-      storeBlobCache(key, fileName, total, held)
-    } catch {
-      /* ignore */
-    }
-    onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
-    resolveDone()
-  }
-  const fail = (e: unknown, reason: 'network' | 'decode' = 'network') => {
-    if (settled) return
-    settled = true
-    try {
-      if (ms.readyState === 'open') ms.endOfStream(reason)
-    } catch {
-      /* ignore */
-    }
-    rejectDone(e instanceof MegaCancelledError ? e : new Error(megaFriendlyError(e)))
-  }
+  const dlUrl = (res as { g?: unknown }).g
+  if (typeof dlUrl !== 'string' || !dlUrl.startsWith('http')) throw new Error('bad dl url')
+  if (cancel?.cancelled()) throw new MegaCancelledError()
 
-  const queue: Uint8Array[] = []
-  const held: Uint8Array[] = []
-  let sb: SourceBuffer | null = null
-  let downloadEnded = false
-  const pump = () => {
-    if (!sb || sb.updating) return
-    const chunk = queue.shift()
-    if (!chunk) {
-      if (downloadEnded) finishOk(held)
-      return
-    }
-    try {
-      sb.appendBuffer(chunk as unknown as ArrayBufferView<ArrayBuffer>)
-    } catch (e) {
-      fail(e, 'decode')
-    }
-  }
+  const { aesKey, iv } = t.deriveMegaAesIv(rawKey)
+  const cryptoKey = await t.importMegaAesKey(aesKey)
 
-  ms.addEventListener(
-    'sourceopen',
-    () => {
-      if (settled || cancel?.cancelled()) {
-        fail(new MegaCancelledError())
-        return
-      }
+  // Head sniff for instant true duration.
+  const HEAD = 262144
+  const headCipher = await t.fetchBytes(dlUrl, 0, HEAD - 1)
+  if (!headCipher || headCipher.length === 0) throw new Error('head failed')
+  const head = await t.megaDecryptRange(cryptoKey, iv, 0, headCipher)
+  let duration = parseAudioDuration(head, null, fileName, total)
+  if (!duration && total && total > HEAD + 1024 && needsTail(extOf(fileName))) {
+    const tailLen = Math.min(total, 1048576)
+    const ts = total - tailLen
+    const aligned = ts - (ts % 16)
+    const tailCipher = await t.fetchBytes(dlUrl, aligned, total - 1)
+    if (tailCipher && tailCipher.length > 0) {
       try {
-        sb = ms.addSourceBuffer(mseType)
-      } catch (e) {
-        fail(e, 'decode')
-        return
+        const tailPlain = await t.megaDecryptRange(cryptoKey, iv, aligned, tailCipher)
+        duration = parseAudioDuration(head, tailPlain.slice(ts - aligned), fileName, total)
+      } catch {
+        /* keep null */
       }
-      sb.addEventListener('updateend', pump)
-      sb.addEventListener('error', () => fail(new Error('decode'), 'decode'))
-      pump()
-    },
-    { once: true }
-  )
-
-  void downloadChunks(
-    target,
-    total,
-    (p) => onProgress?.(p),
-    cancel,
-    (chunk) => {
-      held.push(chunk)
-      queue.push(chunk)
-      pump()
     }
-  ).then(
-    () => {
-      downloadEnded = true
-      pump()
-    },
-    (e) => fail(e)
-  )
+  }
+  if (cancel?.cancelled()) throw new MegaCancelledError()
+  const effDuration = duration ?? durationHint ?? null
 
-  return { url: streamUrl, streaming: true, duration: probed, done }
+  const session = t.startCustomStream({
+    downloadUrl: dlUrl,
+    cryptoKey,
+    iv,
+    totalBytes: total,
+    fileName,
+    mseType,
+    head: { bytes: head, offset: 0 },
+    hooks: {
+      onProgress: (p) => onProgress?.({ bytesLoaded: p.bytesLoaded, bytesTotal: p.bytesTotal, ratio: p.ratio }),
+      cancel: { cancelled: () => cancel?.cancelled() ?? false }
+    }
+  })
+  void session.done.then(
+    () => {
+      try {
+        const held = session.held()
+        if (held.length > 0) storeBlobCache(key, fileName, total, held)
+      } catch {
+        /* ignore */
+      }
+      onProgress?.({ bytesLoaded: total ?? 0, bytesTotal: total, ratio: 1 })
+    },
+    () => {}
+  )
+  return {
+    url: session.url,
+    streaming: true,
+    duration: effDuration,
+    done: session.done,
+    seekAhead: (time, bufferedEnd) => session.seekAhead(time, bufferedEnd, effDuration),
+    destroy: () => session.destroy()
+  }
 }
 
 // ---- MEGA folder -> album import --------------------------------------------
