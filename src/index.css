@@ -13,14 +13,19 @@ html, body {
   max-width: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   @apply bg-void text-white font-body antialiased;
   background-image:
     radial-gradient(900px 420px at 10% -5%, rgba(232, 38, 47, 0.22), transparent 60%),
     radial-gradient(800px 380px at 95% 10%, rgba(255, 106, 43, 0.12), transparent 60%),
     radial-gradient(700px 500px at 50% 110%, rgba(163, 15, 26, 0.25), transparent 60%);
-  background-attachment: fixed;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 8px; }

@@ -25,7 +25,7 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen min-h-dvh">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-abyss/70 p-4 md:flex" aria-label="Admin navigation">
         <div className="flex items-center gap-2.5 px-1 py-2">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-flame">
