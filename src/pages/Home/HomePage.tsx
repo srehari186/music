@@ -88,7 +88,7 @@ export function HomePage() {
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/25 blur-[100px]" aria-hidden />
         <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-flame/15 blur-[100px]" aria-hidden />
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-flame">{greeting}</p>
-        <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+        <h1 className="mt-2 break-words font-display text-[1.65rem] font-extrabold leading-tight tracking-tight sm:text-4xl">
           {profile?.display_name ? `${profile.display_name}, ride` : 'Ride'} your sound wave
         </h1>
         <p className="mt-2 max-w-xl text-sm text-white/60">

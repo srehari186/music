@@ -8,6 +8,11 @@
 
 * { -webkit-tap-highlight-color: transparent; }
 
+html, body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   @apply bg-void text-white font-body antialiased;
   background-image:

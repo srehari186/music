@@ -217,7 +217,7 @@ export function FolderImportPage() {
                   aria-label={`Include ${t.name}`}
                   className="h-4 w-4 shrink-0 accent-[#e8262f]"
                 />
-                <span className="w-6 shrink-0 text-right text-xs text-white/35">{i + 1}</span>
+                <span className="hidden w-6 shrink-0 text-right text-xs text-white/35 sm:block">{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <label htmlFor={`fi-track-${i}`} className="sr-only">Title for {t.name}</label>
                   <input

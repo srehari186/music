@@ -26,7 +26,7 @@ export function SongRow({ song, context, liked, index, showAlbum = true, trailin
         isCurrent ? 'bg-white/5' : ''
       }`}
     >
-      <span className="w-6 shrink-0 text-center text-xs text-white/35">{(index ?? 0) + 1}</span>
+      <span className="hidden w-6 shrink-0 text-center text-xs text-white/35 sm:block">{(index ?? 0) + 1}</span>
       <img
         src={imgOk ? song.cover_url || coverFallback(song.title, song.artist) : coverFallback(song.title, song.artist)}
         alt={`${song.title} cover`}
