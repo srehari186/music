@@ -19,12 +19,47 @@ export function HomePage() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const stripRef = useRef<HTMLDivElement | null>(null)
+  const holdTimer = useRef<number | null>(null)
+  const holdFired = useRef(false)
 
   const scrollStrip = useCallback((dir: 1 | -1) => {
     const el = stripRef.current
     if (!el) return
     el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
   }, [])
+
+  const stopHold = useCallback(() => {
+    if (holdTimer.current !== null) {
+      clearInterval(holdTimer.current)
+      holdTimer.current = null
+    }
+  }, [])
+
+  // Press-and-hold glides until the first/last album; a quick tap steps once.
+  const startHold = useCallback(
+    (dir: 1 | -1) => {
+      holdFired.current = false
+      scrollStrip(dir)
+      stopHold()
+      holdTimer.current = window.setInterval(() => {
+        const el = stripRef.current
+        if (!el) {
+          stopHold()
+          return
+        }
+        const max = el.scrollWidth - el.clientWidth
+        if ((dir === 1 && el.scrollLeft >= max - 4) || (dir === -1 && el.scrollLeft <= 4)) {
+          stopHold()
+          return
+        }
+        holdFired.current = true
+        scrollStrip(dir)
+      }, 350)
+    },
+    [scrollStrip, stopHold]
+  )
+
+  useEffect(() => stopHold, [stopHold])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -146,16 +181,38 @@ export function HomePage() {
               {filtered.length > 3 && (
                 <>
                   <button
-                    onClick={() => scrollStrip(-1)}
-                    aria-label="Scroll albums left"
-                    className="absolute left-0 top-[35%] grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
+                    onClick={() => {
+                      if (holdFired.current) {
+                        holdFired.current = false
+                        return
+                      }
+                      scrollStrip(-1)
+                    }}
+                    onPointerDown={() => startHold(-1)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onContextMenu={(e) => e.preventDefault()}
+                    aria-label="Scroll albums left (hold to glide to the first)"
+                    className="absolute left-0 top-[35%] grid h-9 w-9 -translate-y-1/2 touch-none place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={() => scrollStrip(1)}
-                    aria-label="Scroll albums right"
-                    className="absolute right-0 top-[35%] grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
+                    onClick={() => {
+                      if (holdFired.current) {
+                        holdFired.current = false
+                        return
+                      }
+                      scrollStrip(1)
+                    }}
+                    onPointerDown={() => startHold(1)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onContextMenu={(e) => e.preventDefault()}
+                    aria-label="Scroll albums right (hold to glide to the last)"
+                    className="absolute right-0 top-[35%] grid h-9 w-9 -translate-y-1/2 touch-none place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
                   >
                     <ChevronRight className="h-5 w-5" />
                   </button>
