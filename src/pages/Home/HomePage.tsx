@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Disc3 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Disc3, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { AlbumCard } from '../../components/AlbumCard'
 import { SkeletonCards } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
-import { fetchFeaturedSongs } from '../../services/songService'
+import { fetchFeaturedSongs, fetchPopularSongs } from '../../services/songService'
 import { friendlyError, groupSongsByAlbum } from '../../utils'
 
 const PAGE_SIZE = 10
@@ -13,6 +13,7 @@ const PAGE_SIZE = 10
 export function HomePage() {
   const { profile } = useAuth()
   const [featured, setFeatured] = useState<import('../../types/database').Song[]>([])
+  const [popular, setPopular] = useState<import('../../types/database').Song[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -20,7 +21,9 @@ export function HomePage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setFeatured(await fetchFeaturedSongs(200))
+      const [f, p] = await Promise.all([fetchFeaturedSongs(200), fetchPopularSongs(100)])
+      setFeatured(f)
+      setPopular(p)
     } catch (e) {
       toast.error(friendlyError(e, 'Could not load music. Check your Supabase setup.'))
     } finally {
@@ -45,6 +48,17 @@ export function HomePage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const visibleKeys = useMemo(() => new Set(visible.map((a) => a.key)), [visible])
+
+  // Recommended: most-played albums that aren't already shown above.
+  const { albums: popularAlbums } = useMemo(() => groupSongsByAlbum(popular), [popular])
+  const recommended = useMemo(
+    () =>
+      popularAlbums
+        .filter((g) => !visibleKeys.has(g.key) && (!q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q)))
+        .slice(0, 10),
+    [popularAlbums, visibleKeys, q]
+  )
 
   // Reset to the first page whenever the filter changes.
   useEffect(() => {
@@ -153,6 +167,30 @@ export function HomePage() {
               </nav>
             )}
           </>
+        )}
+      </section>
+
+      <section aria-label="Recommended albums">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel">
+            <Wand2 className="h-5 w-5 text-primary-soft" />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-bold tracking-tight">Recommended for you</h2>
+            <p className="text-xs text-white/50">Popular albums you might like</p>
+          </div>
+        </div>
+
+        {recommended.length === 0 ? (
+          <EmptyState message="More recommendations coming soon." />
+        ) : (
+          <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
+            {recommended.map((a) => (
+              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
+                <AlbumCard album={a} />
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </div>
