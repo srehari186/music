@@ -16,10 +16,12 @@ import {
 } from 'lucide-react'
 import { useMusicPlayer } from '../../contexts/MusicPlayerContext'
 import { coverFallback, formatTime } from '../../utils'
+import { NowPlaying } from '../NowPlaying'
 
 export function AudioPlayer() {
   const p = useMusicPlayer()
   const [queueOpen, setQueueOpen] = useState(false)
+  const [nowPlayingOpen, setNowPlayingOpen] = useState(false)
   const song = p.currentSong
 
   if (!song) return null
@@ -114,15 +116,21 @@ export function AudioPlayer() {
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2.5 md:gap-4 md:px-6 md:py-3">
           {/* Mobile bottom nav offset: player sits above nav on mobile */}
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:max-w-xs">
-            <img
-              src={song.cover_url || coverFallback(song.title, song.artist)}
-              alt={`${song.title} artwork`}
-              className="h-10 w-10 shrink-0 rounded-xl object-cover sm:h-11 sm:w-11 md:h-14 md:w-14"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{song.title}</p>
-              <p className="truncate text-xs text-white/55">{song.artist ?? 'Unknown artist'}</p>
-            </div>
+            <button
+              onClick={() => setNowPlayingOpen(true)}
+              aria-label={`Open full screen player for ${song.title}`}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left transition hover:opacity-90 focus-ring sm:gap-3"
+            >
+              <img
+                src={song.cover_url || coverFallback(song.title, song.artist)}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-xl object-cover sm:h-11 sm:w-11 md:h-14 md:w-14"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{song.title}</span>
+                <span className="block truncate text-xs text-white/55">{song.artist ?? 'Unknown artist'}</span>
+              </span>
+            </button>
             {p.isLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-flame" aria-label="Loading audio" />}
           </div>
 
@@ -225,6 +233,7 @@ export function AudioPlayer() {
         {/* spacer so content isn't hidden behind mobile nav */}
         <div className="h-14 md:hidden" aria-hidden />
       </div>
+      <NowPlaying open={nowPlayingOpen} onClose={() => setNowPlayingOpen(false)} />
     </>
   )
 }
