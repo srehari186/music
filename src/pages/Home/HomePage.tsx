@@ -124,7 +124,7 @@ export function HomePage() {
         ) : (
           <>
             {/* Phones: every album in one swipe strip, first to last. */}
-            <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
+            <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-proximity gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
               {filtered.map((a) => (
                 <div key={a.key} className="w-[28%] shrink-0 snap-center">
                   <AlbumCard album={a} />
