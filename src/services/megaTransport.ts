@@ -80,7 +80,12 @@ export async function megaDecryptRange(
   return new Uint8Array(out)
 }
 
-/** Single HTTPS range fetch. Returns null on any failure (caller falls back). */
+/**
+ * Single byte-range fetch. MEGA serves ranges via a `/start-end` URL suffix
+ * on a plain GET — deliberately NOT the `Range` header, which would trigger
+ * a CORS preflight that content servers may reject.
+ * Returns null on any failure (caller falls back).
+ */
 export async function fetchBytes(
   url: string,
   start: number,
@@ -88,14 +93,18 @@ export async function fetchBytes(
   signal?: AbortSignal
 ): Promise<Uint8Array | null> {
   try {
-    const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` }, signal })
-    if (res.status === 206) return new Uint8Array(await res.arrayBuffer())
-    if (res.status === 200) {
-      const full = new Uint8Array(await res.arrayBuffer())
-      if (start === 0) return full.slice(0, end + 1)
-      return null
+    const res = await fetch(`${url}/${start}-${end}`, { signal })
+    if (res.status === 509) return null // bandwidth quota — handled as rate limit upstream
+    if (res.status !== 200 && res.status !== 206) return null
+    const buf = new Uint8Array(await res.arrayBuffer())
+    if (buf.length === 0) return null
+    const want = end - start + 1
+    if (buf.length > want) {
+      // Server ignored the suffix and sent the whole file: only usable for offset 0.
+      if (start !== 0) return null
+      return buf.slice(0, want)
     }
-    return null
+    return buf
   } catch {
     return null
   }
