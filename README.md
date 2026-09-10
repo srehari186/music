@@ -19,7 +19,6 @@ An original, production-ready music streaming web app inspired by modern platfor
 - Dashboard: total users/songs/playlists/plays, most-played bars, recently added, recent users
 - Song management: search/filter/sort, add, edit, delete (with confirm)
 - **MEGA folder → album import** (`/admin/songs/import`): paste a `mega.nz/folder/…#key…` link, every audio file inside becomes a song sharing one album name + cover image (each track streams individually via its own `…/file/<id>` link)
-- **Real song lengths**: the add-song form, folder import, and a "Detect lengths" button on the Songs page read each track's true duration (metadata preload for direct URLs, decrypt-and-measure for MEGA) and store it — no guessing
 - Users list (no passwords ever exposed)
 
 ## Technology stack
@@ -108,8 +107,7 @@ Two kinds of sources are supported:
 2. **MEGA share links** (`https://mega.nz/file/…#key…`, legacy `/#!…` links, and folder links). A MEGA link is not an audio file — it is an encrypted file ID + key — so Waveora resolves it **entirely in the listener's browser** (`src/services/megaService.ts`, via the fetch-based `megajs` SDK loaded on demand):
    - fetches file metadata from MEGA's public API,
    - downloads the ciphertext in chunks with a fetch indicator sweeping inside the seek bar,
-   - decrypts it client-side (AES-128-CTR) and **plays while fetching**: mp3/m4a streams progressively into the audio element via Media Source Extensions (no waiting for the full file); other formats and older browsers fall back to download-then-play automatically,
-   - completed streams become replay-instant memory-cache entries; per-song `…/file/<id>` links make every folder track individually streamable.
+   - decrypts it client-side (AES-128-CTR) and plays it as a Blob URL (cached in memory for the session, so replays are instant).
    - Folder links play the embedded/first audio file found (mp3, m4a, ogg, wav, flac, opus, webm…).
    - The link **must include the key** (the part after `#`); keyless links are rejected with a friendly message, as are deleted/private/rate-limited files.
 

@@ -5,7 +5,6 @@ import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import type { Song } from '../../types/database'
 import { supabase } from '../../lib/supabase'
 import { adminDeleteSong } from '../../services/songService'
-import { probeDuration } from '../../services/durationService'
 import { LoadingScreen } from '../../components/Loading'
 import { formatCount, friendlyError } from '../../utils'
 
@@ -19,7 +18,6 @@ export function AdminSongsPage() {
   const [featured, setFeatured] = useState('all')
   const [sort, setSort] = useState<SortKey>('newest')
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [fixing, setFixing] = useState<string | null>(null)
 
   const load = async () => {
     try {
@@ -56,37 +54,6 @@ export function AdminSongsPage() {
     return list
   }, [songs, query, genre, featured, sort])
 
-  const missingCount = songs.filter((s) => s.duration == null).length
-
-  const onFixDurations = async () => {
-    const missing = songs.filter((s) => s.duration == null)
-    if (missing.length === 0) {
-      toast.success('Every song already has a length')
-      return
-    }
-    let ok = 0
-    let skipped = 0
-    for (let i = 0; i < missing.length; i++) {
-      setFixing(`${i + 1}/${missing.length}`)
-      try {
-        const d = await probeDuration(missing[i].audio_url)
-        if (d && d > 0) {
-          const { error } = await supabase.from('songs').update({ duration: d } as never).eq('id', missing[i].id)
-          if (error) throw error
-          ok++
-          setSongs((prev) => prev.map((s) => (s.id === missing[i].id ? { ...s, duration: d } : s)))
-        } else {
-          skipped++
-        }
-      } catch {
-        skipped++
-      }
-    }
-    setFixing(null)
-    if (ok > 0) toast.success(`Lengths detected for ${ok} ${ok === 1 ? 'song' : 'songs'}${skipped > 0 ? `, ${skipped} skipped` : ''}`)
-    else toast.error('Could not detect any lengths — check the audio URLs')
-  }
-
   const onDelete = async (song: Song) => {
     if (!confirm(`Are you sure you want to delete "${song.title}"?`)) return
     setDeleting(song.id)
@@ -111,16 +78,6 @@ export function AdminSongsPage() {
           <p className="mt-1 text-sm text-white/55">{filtered.length} of {songs.length} tracks</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {missingCount > 0 && (
-            <button
-              onClick={onFixDurations}
-              disabled={fixing !== null}
-              className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 disabled:opacity-60 focus-ring"
-              title="Read the real length of every song missing one"
-            >
-              {fixing ? `Detecting ${fixing}…` : `Detect lengths (${missingCount})`}
-            </button>
-          )}
           <Link to="/admin/songs/import" className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 focus-ring">
             <Plus className="h-4 w-4" /> Import folder
           </Link>
