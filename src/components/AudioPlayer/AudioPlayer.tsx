@@ -76,7 +76,7 @@ export function AudioPlayer() {
         </div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-abyss/92 backdrop-blur-xl md:bottom-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="fixed inset-x-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-2xl border border-line bg-abyss/95 shadow-card backdrop-blur-xl md:inset-x-0 md:bottom-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t md:shadow-none md:pb-[env(safe-area-inset-bottom)]">
         {/* progress / fetch-loading bar. While streaming, the dim layer is
             fetched bytes (YouTube-style) and the bright layer is the playhead. */}
         <div className="group relative h-1 w-full bg-white/10" role="presentation">
@@ -236,8 +236,6 @@ export function AudioPlayer() {
             <ListMusic className="h-4 w-4" />
           </button>
         </div>
-        {/* spacer so content isn't hidden behind mobile nav */}
-        <div className="h-14 md:hidden" aria-hidden />
       </div>
       <NowPlaying open={nowPlayingOpen} onClose={() => setNowPlayingOpen(false)} />
     </>
