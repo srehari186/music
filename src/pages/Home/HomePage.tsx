@@ -123,7 +123,7 @@ export function HomePage() {
             {/* Phones: one big album per swipe, left to right. Tablets/desktops: grid. */}
             <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
               {visible.map((a) => (
-                <div key={a.key} className="w-[55%] shrink-0 snap-center">
+                <div key={a.key} className="w-[28%] shrink-0 snap-center">
                   <AlbumCard album={a} />
                 </div>
               ))}
