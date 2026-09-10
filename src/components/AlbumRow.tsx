@@ -25,7 +25,7 @@ export function AlbumRow({ album, index }: { album: AlbumGroup; index: number })
           src={album.cover || coverFallback(album.name, album.artist)}
           alt=""
           loading="lazy"
-          className="h-16 w-16 shrink-0 rounded-xl object-cover"
+          className="h-20 w-20 shrink-0 rounded-xl object-cover"
           onError={(e) => {
             ;(e.target as HTMLImageElement).src = coverFallback(album.name, album.artist)
           }}
