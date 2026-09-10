@@ -1,105 +1,58 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clock3, Flame, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Disc3 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { Song } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
-import { useMusicPlayer } from '../../contexts/MusicPlayerContext'
-import { SongCard } from '../../components/SongCard'
 import { AlbumCard } from '../../components/AlbumCard'
-import { SongRow } from '../../components/SongRow'
-import { SkeletonCards, LoadingScreen } from '../../components/Loading'
+import { SkeletonCards } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
-import { AddToPlaylistModal } from '../../components/AddToPlaylistModal'
-import { fetchFeaturedSongs, fetchPopularSongs, fetchRecentSongs, fetchRecentlyPlayed, getLikedSongIds } from '../../services/songService'
-import { fetchPlaylists } from '../../services/playlistService'
-import { formatRelativeTime, friendlyError, groupSongsByAlbum } from '../../utils'
-import type { Playlist } from '../../types/database'
+import { fetchFeaturedSongs } from '../../services/songService'
+import { friendlyError, groupSongsByAlbum } from '../../utils'
 
-function SectionHead({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
-  return (
-    <div className="mb-4 flex items-center gap-3">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/8 border border-line bg-panel">{icon}</span>
-      <div>
-        <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
-        <p className="text-xs text-white/50">{subtitle}</p>
-      </div>
-    </div>
-  )
-}
+const PAGE_SIZE = 10
 
 export function HomePage() {
-  const { user, profile } = useAuth()
-  const { playSongs } = useMusicPlayer()
-  const [recent, setRecent] = useState<Song[]>([])
-  const [featured, setFeatured] = useState<Song[]>([])
-  const [popular, setPopular] = useState<Song[]>([])
-  const [history, setHistory] = useState<{ id: string; played_at: string; songs: Song }[]>([])
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
-  const [playlists, setPlaylists] = useState<Playlist[]>([])
-  const [modalSong, setModalSong] = useState<Song | null>(null)
+  const { profile } = useAuth()
+  const [featured, setFeatured] = useState<import('../../types/database').Song[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
-    if (!user) return
     setLoading(true)
     try {
-      const [r, f, p, h, liked, pls] = await Promise.all([
-        fetchRecentSongs(30),
-        fetchFeaturedSongs(10),
-        fetchPopularSongs(10),
-        fetchRecentlyPlayed(user.id, 8),
-        getLikedSongIds(user.id),
-        fetchPlaylists(user.id)
-      ])
-      setRecent(r)
-      setFeatured(f)
-      setPopular(p)
-      setHistory(h)
-      setLikedIds(liked)
-      setPlaylists(pls)
+      setFeatured(await fetchFeaturedSongs(200))
     } catch (e) {
       toast.error(friendlyError(e, 'Could not load music. Check your Supabase setup.'))
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const toggleLikeLocal = (songId: string, liked: boolean) => {
-    setLikedIds((prev) => {
-      const next = new Set(prev)
-      if (liked) next.add(songId)
-      else next.delete(songId)
-      return next
-    })
-  }
+  const q = query.trim().toLowerCase()
+
+  // Featured songs collapse into single albums, newest first.
+  // NOTE: all hooks stay above the early return — changing hook order
+  // between renders crashes React to a blank page.
+  const { albums } = useMemo(() => groupSongsByAlbum(featured), [featured])
+  const filtered = useMemo(
+    () => albums.filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q)),
+    [albums, q]
+  )
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  // Reset to the first page whenever the filter changes.
+  useEffect(() => {
+    setPage(1)
+  }, [query])
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-
-  const recommended = [...featured, ...popular].filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i).slice(0, 10)
-  const q = query.trim().toLowerCase()
-  const filterFn = (s: Song) => !q || `${s.title} ${s.artist ?? ''} ${s.album ?? ''}`.toLowerCase().includes(q)
-
-  // Recently added shows albums only: songs sharing an album collapse
-  // into one card (newest first). Loose singles live in Search, Library
-  // and Trending instead.
-  // NOTE: all hooks stay above the early return — changing hook order
-  // between renders crashes React to a blank page.
-  const { albums: recentAlbums } = useMemo(() => groupSongsByAlbum(recent), [recent])
-  const shownAlbums = recentAlbums
-    .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
-    .slice(0, 10)
-
-  // Recommended shows albums only, same as Recently Added.
-  const { albums: recommendedAlbums } = useMemo(() => groupSongsByAlbum(recommended), [recommended])
-  const shownRecommended = recommendedAlbums
-    .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
-    .slice(0, 10)
 
   if (loading) {
     return (
@@ -108,11 +61,12 @@ export function HomePage() {
           <div className="skeleton h-8 w-64 rounded-lg" />
           <div className="skeleton mt-2 h-4 w-40 rounded" />
         </div>
-        <SkeletonCards count={5} />
-        <SkeletonCards count={5} />
+        <SkeletonCards count={10} />
       </div>
     )
   }
+
+  const pageNumbers = pageList(safePage, totalPages)
 
   return (
     <div className="space-y-10">
@@ -124,93 +78,100 @@ export function HomePage() {
           {profile?.display_name ? `${profile.display_name}, ride` : 'Ride'} your sound wave
         </h1>
         <p className="mt-2 max-w-xl text-sm text-white/60">
-          Fresh drops, featured picks and your recent rotations — all in one place. Press play and stay in flow.
+          Featured albums, hand-picked for you. Open any album to play every song inside.
         </p>
         <div className="mt-5 max-w-xl">
-          <SearchBar value={query} onChange={setQuery} placeholder="Filter this page by title, artist, album…" />
+          <SearchBar value={query} onChange={setQuery} placeholder="Filter albums by name or artist…" />
         </div>
       </section>
 
-      {history.length > 0 && (
-        <section aria-label="Recently played">
-          <SectionHead icon={<Clock3 className="h-5 w-5 text-flame" />} title="Jump back in" subtitle="Your recent rotations" />
-          <div className="rounded-2xl border border-line bg-panel/60 p-2">
-            {history.slice(0, 5).map((h, i) => (
-              <div key={h.id} className="flex items-center gap-2">
-                <div className="flex-1">
-                  <SongRow song={h.songs} context={history.map((x) => x.songs)} index={i} liked={likedIds.has(h.songs.id) ? true : undefined} onUnlike={undefined} />
-                </div>
-                <span className="pr-3 text-[11px] text-white/35">{formatRelativeTime(h.played_at)}</span>
-              </div>
-            ))}
+      <section aria-label="Featured albums">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel">
+            <Disc3 className="h-5 w-5 text-flame" />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-bold tracking-tight">Featured</h2>
+            <p className="text-xs text-white/50">
+              {filtered.length} {filtered.length === 1 ? 'album' : 'albums'}
+              {totalPages > 1 && ` • Page ${safePage} of ${totalPages}`}
+            </p>
           </div>
-        </section>
-      )}
-
-      <section aria-label="Recently added">
-        <SectionHead icon={<Sparkles className="h-5 w-5 text-ember" />} title="Recently added" subtitle="Fresh albums on Waveora" />
-        {shownAlbums.length === 0 ? (
-          <EmptyState message={recent.length === 0 ? 'No music yet. Ask an admin to add songs or import an album.' : 'No albums found.'} />
-        ) : (
-          <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-            {shownAlbums.map((a) => (
-              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
-                <AlbumCard album={a} />
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section aria-label="Featured songs">
-        <SectionHead icon={<Flame className="h-5 w-5 text-rose" />} title="Featured" subtitle="Curated picks from Waveora editors" />
-        {featured.filter(filterFn).length === 0 ? (
-          <EmptyState message="No featured songs right now." />
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {featured.filter(filterFn).map((s) => (
-              <SongCard key={s.id} song={s} context={featured} liked={likedIds.has(s.id)} onToggleLike={toggleLikeLocal} onAddToPlaylist={setModalSong} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section aria-label="Popular songs">
-        <SectionHead icon={<Flame className="h-5 w-5 text-flame" />} title="Trending now" subtitle="Most played across Waveora" />
-        <div className="rounded-2xl border border-line bg-panel/60 p-2">
-          {popular.filter(filterFn).slice(0, 8).map((s, i) => (
-            <SongRow key={s.id} song={s} context={popular} index={i} liked={likedIds.has(s.id) ? true : undefined} />
-          ))}
-          {popular.filter(filterFn).length === 0 && <EmptyState message="No results found." />}
         </div>
-        {popular.length > 0 && (
-          <button
-            onClick={() => playSongs(popular, 0)}
-            className="mt-3 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/15 focus-ring"
-          >
-            Play all trending
-          </button>
-        )}
-      </section>
 
-      <section aria-label="Recommended">
-        <SectionHead icon={<Wand2 className="h-5 w-5 text-primary-soft" />} title="Recommended for you" subtitle="Albums picked for your taste" />
-        {shownRecommended.length === 0 ? (
-          <EmptyState message="No recommendations yet." />
+        {visible.length === 0 ? (
+          <EmptyState
+            message={featured.length === 0 ? 'No featured albums yet. Ask an admin to feature some music.' : 'No albums found.'}
+          />
         ) : (
-          <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-            {shownRecommended.map((a) => (
-              <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
-                <AlbumCard album={a} />
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visible.map((a) => (
+                <AlbumCard key={a.key} album={a} />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="Album pages">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  aria-label="Previous page"
+                  className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 transition hover:bg-white/15 disabled:opacity-40 focus-ring"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {pageNumbers.map((n, i) =>
+                  n === '…' ? (
+                    <span key={`gap-${i}`} className="px-1 text-sm text-white/40" aria-hidden>
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      onClick={() => setPage(n as number)}
+                      aria-label={`Page ${n}`}
+                      aria-current={n === safePage ? 'page' : undefined}
+                      className={`h-9 min-w-[2.25rem] rounded-xl px-2 text-sm font-bold transition focus-ring ${
+                        n === safePage
+                          ? 'bg-gradient-to-r from-primary to-primary-deep shadow-glow'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  aria-label="Next page"
+                  className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 transition hover:bg-white/15 disabled:opacity-40 focus-ring"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </nav>
+            )}
+          </>
         )}
       </section>
-
-      <AddToPlaylistModal song={modalSong} playlists={playlists} onClose={() => setModalSong(null)} />
     </div>
   )
+}
+
+/** Compact page list with ellipses, e.g. [1, '…', 4, 5, 6, '…', 12]. */
+function pageList(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set<number>([1, 2, current - 1, current, current + 1, total - 1, total])
+  const sorted = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b)
+  const out: (number | '…')[] = []
+  let prev = 0
+  for (const n of sorted) {
+    if (n - prev > 1) out.push('…')
+    out.push(n)
+    prev = n
+  }
+  return out
 }
 
 export function EmptyState({ message }: { message: string }) {
@@ -219,8 +180,4 @@ export function EmptyState({ message }: { message: string }) {
       {message}
     </div>
   )
-}
-
-export function HomeLoadingFallback() {
-  return <LoadingScreen label="Loading your music…" />
 }
