@@ -119,7 +119,7 @@ export function HomePage() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {visible.map((a) => (
                 <AlbumCard key={a.key} album={a} />
               ))}
@@ -184,7 +184,7 @@ export function HomePage() {
         {recommended.length === 0 ? (
           <EmptyState message="More recommendations coming soon." />
         ) : (
-          <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
+          <div className="no-scrollbar -mx-1 flex touch-pan-x gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 snap-x md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
             {recommended.map((a) => (
               <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
                 <AlbumCard album={a} />
