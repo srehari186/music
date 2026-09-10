@@ -24,6 +24,13 @@ export class HtmlAudioProvider implements AudioProvider {
   }
 
   load(url: string) {
+    // Blob URLs (decrypted MEGA audio, MSE live streams) must buffer
+    // aggressively — metadata-only preload can stall stream startup.
+    try {
+      this.el.preload = url.startsWith('blob:') ? 'auto' : 'metadata'
+    } catch {
+      /* ignore */
+    }
     this.el.src = url
     this.el.load()
   }

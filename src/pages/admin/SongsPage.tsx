@@ -78,6 +78,9 @@ export function AdminSongsPage() {
           <p className="mt-1 text-sm text-white/55">{filtered.length} of {songs.length} tracks</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/admin/songs/check" className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 focus-ring">
+            Check MEGA link
+          </Link>
           <Link to="/admin/songs/import" className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/15 focus-ring">
             <Plus className="h-4 w-4" /> Import folder
           </Link>

@@ -276,6 +276,8 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
   const finishOk = () => {
     if (settled) return
     settled = true
+    clearTimeout(openTimer)
+    clearInterval(stallTimer)
     try {
       if (ms.readyState === 'open') ms.endOfStream()
     } catch {
@@ -286,6 +288,8 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
   const fail = (e: unknown) => {
     if (settled) return
     settled = true
+    clearTimeout(openTimer)
+    clearInterval(stallTimer)
     try {
       if (ms.readyState === 'open') ms.endOfStream('network')
     } catch {
@@ -303,6 +307,22 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
   let decryptedBytes = head.bytes.length
   let controller = new AbortController()
   let runToken = 0
+  let lastBytesAt = Date.now()
+  const touch = () => {
+    lastBytesAt = Date.now()
+  }
+
+  // Watchdogs: never hang silently. No SourceBuffer within 12s (attach
+  // problem) or no bytes for 45s mid-stream (stalled/rate-limited) surfaces
+  // a real error instead of an endless spinner.
+  const openTimer = setTimeout(() => {
+    if (!sb && !settled) fail(new Error('source-timeout'))
+  }, 12000)
+  const stallTimer = setInterval(() => {
+    if (!settled && !downloadEnded && Date.now() - lastBytesAt > 45000) {
+      fail(new Error('stalled'))
+    }
+  }, 10000)
 
   const reportProgress = () => {
     hooks.onProgress({
@@ -361,6 +381,7 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
         decryptedBytes = Math.max(decryptedBytes, off)
         held.push(plain)
         queue.push(plain)
+        touch()
         reportProgress()
         pump()
         if (totalBytes != null && off >= totalBytes) break
@@ -384,6 +405,7 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
       }
       try {
         sb = ms.addSourceBuffer(mseType)
+        clearTimeout(openTimer)
       } catch {
         fail(new Error('sourcebuffer'))
         return
@@ -394,6 +416,7 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
       if (index) index.feed(head.bytes, head.offset)
       held.push(head.bytes)
       queue.push(head.bytes)
+      touch()
       reportProgress()
       pump()
       runToken++
@@ -457,6 +480,7 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
       decryptedBytes = Math.max(decryptedBytes, fetchOffset)
       held.push(plain)
       queue.push(plain)
+      touch()
       reportProgress()
       pump()
       void runFrom(fetchOffset, token)

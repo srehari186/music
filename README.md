@@ -19,6 +19,7 @@ An original, production-ready music streaming web app inspired by modern platfor
 - Dashboard: total users/songs/playlists/plays, most-played bars, recently added, recent users
 - Song management: search/filter/sort, add, edit, delete (with confirm)
 - **MEGA folder → album import** (`/admin/songs/import`): paste a `mega.nz/folder/…#key…` link, every audio file inside becomes a song sharing one album name + cover image (each track streams individually via its own `…/file/<id>` link)
+- **MEGA link diagnostics** (`/admin/songs/check`): runs any link through every playback stage (format → metadata → download URL → range fetch → decrypt → duration → playback mode) and pinpoints the exact failing step
 - Users list (no passwords ever exposed)
 
 ## Technology stack

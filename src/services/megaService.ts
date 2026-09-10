@@ -223,7 +223,7 @@ interface MegaTarget {
   file: MegaFileLike
 }
 
-async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaTarget> {
+export async function loadMegaTarget(key: string, cancel?: CancelHandle): Promise<MegaTarget> {
   const { File: MegaFile } = await loadMegaLibrary()
 
   let file: MegaFileLike
@@ -407,6 +407,134 @@ export async function resolveAudioSource(
   if (!isMegaUrl(url)) return url
   const resolved = await resolveMegaAudio(url, onProgress, cancel)
   return resolved.objectUrl
+}
+
+// ---- Link diagnostics (admin "Check MEGA link" tool) ------------------------
+
+export interface MegaDiagStage {
+  label: string
+  ok: boolean
+  detail: string
+}
+
+function detectContainer(b: Uint8Array): string {
+  if (b.length < 12) return `only ${b.length} bytes received`
+  if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return 'MP3 (ID3v2 tag at start)'
+  if (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) return 'MP3 (frame sync at start)'
+  if (b[0] === 0x66 && b[1] === 0x4c && b[2] === 0x61 && b[3] === 0x43) return 'FLAC'
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) return 'WAV'
+  if (b[0] === 0x4f && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53) return 'OGG'
+  if (String.fromCharCode(...b.slice(4, 12)).includes('ftyp')) return 'MP4/M4A (ftyp box)'
+  return 'unrecognized bytes: ' + [...b.slice(0, 8)].map((x) => x.toString(16).padStart(2, '0')).join(' ')
+}
+
+/**
+ * Runs a MEGA link through every pipeline stage and reports pass/fail each
+ * step — so a broken link can be pinpointed instead of guessed at.
+ */
+export async function diagnoseMegaLink(url: string): Promise<MegaDiagStage[]> {
+  const stages: MegaDiagStage[] = []
+  const push = (label: string, ok: boolean, detail: string) => {
+    stages.push({ label, ok, detail })
+  }
+
+  const key = normalizeMegaUrl(url.trim())
+  if (!isMegaUrl(key) || !key.includes('#')) {
+    push('Link format', false, 'Not a MEGA share link with a key (the part after #).')
+    return stages
+  }
+  push('Link format', true, 'Recognized MEGA share link.')
+
+  let loaded: { fileName: string; total: number | null; target: MegaFileLike; file: MegaFileLike }
+  try {
+    loaded = await loadMegaTarget(key)
+  } catch (e) {
+    push('Metadata', false, e instanceof Error ? e.message : 'Metadata request failed.')
+    return stages
+  }
+  const { fileName, total, target, file } = loaded
+  const sizeNote = total != null ? `${(total / 1048576).toFixed(1)} MB` : 'unknown size'
+  push('Metadata', true, `"${fileName}" • ${sizeNote}`)
+  const rawKey = (target as unknown as { key?: unknown }).key as Uint8Array | undefined
+  if (!rawKey || rawKey.length < 32) {
+    push('Decryption key', false, 'Link has no usable decryption key. Copy the full link including the part after #.')
+    return stages
+  }
+  push('Decryption key', true, 'Key present (32 bytes).')
+
+  let dlUrl: string
+  try {
+    dlUrl = await fetchMegaDownloadUrl(file, target)
+  } catch (e) {
+    push('Download URL', false, `${e instanceof Error ? e.message : 'request failed'} — the file may be removed, private, or rate-limited.`)
+    return stages
+  }
+  let host = ''
+  try {
+    host = new URL(dlUrl).hostname
+  } catch {
+    host = dlUrl.slice(0, 40)
+  }
+  push('Download URL', true, `Storage host: ${host}`)
+
+  const t = await import('./megaTransport')
+  const HEAD = 65536
+  let headCipher: Uint8Array | null = null
+  try {
+    headCipher = await t.fetchBytes(dlUrl, 0, HEAD - 1)
+  } catch {
+    headCipher = null
+  }
+  if (!headCipher || headCipher.length === 0) {
+    push('Range fetch (first 64KB)', false, 'No bytes received — the browser blocked the request (ad-blocker/CORS) or the network/rate limit stopped it.')
+    return stages
+  }
+  push('Range fetch (first 64KB)', true, `${(headCipher.length / 1024).toFixed(0)} KB received — ranges + CORS work in this browser.`)
+
+  let head: Uint8Array | null = null
+  try {
+    const { aesKey, iv } = t.deriveMegaAesIv(rawKey)
+    const cryptoKey = await t.importMegaAesKey(aesKey)
+    head = await t.megaDecryptRange(cryptoKey, iv, 0, headCipher)
+  } catch {
+    head = null
+  }
+  if (!head) {
+    push('Decrypt', false, 'Decryption failed — the link key does not match this file.')
+    return stages
+  }
+  push('Decrypt', true, `First bytes decode to: ${detectContainer(head)}`)
+
+  let duration = parseAudioDuration(head, null, fileName, total)
+  if (!duration && total && total > HEAD + 1024 && needsTail(extOf(fileName))) {
+    try {
+      const tailLen = Math.min(total, 1048576)
+      const ts = total - tailLen
+      const aligned = ts - (ts % 16)
+      const tailCipher = await t.fetchBytes(dlUrl, aligned, total - 1)
+      if (tailCipher && tailCipher.length > 0) {
+        const { aesKey, iv } = t.deriveMegaAesIv(rawKey)
+        const cryptoKey = await t.importMegaAesKey(aesKey)
+        const tailPlain = await t.megaDecryptRange(cryptoKey, iv, aligned, tailCipher)
+        duration = parseAudioDuration(head, tailPlain.slice(ts - aligned), fileName, total)
+      }
+    } catch {
+      /* keep null */
+    }
+  }
+  if (duration && duration > 0) {
+    push('Duration', true, `True length: ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')} — will show while streaming.`)
+  } else {
+    push('Duration', false, 'Length not found in headers — the timeline appears after the full fetch. (MP3/XING, WAV, FLAC and faststart-M4A normally resolve.)')
+  }
+
+  const mseType = mseTypeFor(fileName)
+  if (mseType && mseSupported(mseType)) {
+    push('Playback mode', true, 'This browser will stream progressively (play while fetching) with seeking.')
+  } else {
+    push('Playback mode', true, 'This browser/format will download-then-play (full fetch first, then audio starts).')
+  }
+  return stages
 }
 
 // ---- Duration from partial data (shows length while streaming) -------------
@@ -762,33 +890,13 @@ function needsTail(ext: string): boolean {
   )
 }
 
-/**
- * YouTube-style path: download URL via the file's own API, true length
- * sniffed from head/tail ranges, then progressive MSE streaming with
- * seeking. Throws when unavailable (caller falls back to legacy).
- */
-async function openCustomSession(
-  key: string,
-  fileName: string,
-  total: number | null,
-  target: MegaFileLike,
-  file: MegaFileLike,
-  cancel: CancelHandle | undefined,
-  onProgress: ((p: MegaProgress) => void) | undefined,
-  durationHint: number | null
-): Promise<MegaStreamSession> {
-  const t = await import('./megaTransport')
-  const rawKey = (target as unknown as { key?: unknown }).key as Uint8Array | undefined
-  if (!rawKey || (rawKey as Uint8Array).length < 32) throw new Error('no key')
-  const mseType = mseTypeFor(fileName)
-  if (!mseType || !mseSupported(mseType)) throw new Error('no-mse')
-
+/** Download URL via the file's own API (same request the SDK downloader uses). */
+async function fetchMegaDownloadUrl(file: MegaFileLike, target: MegaFileLike): Promise<string> {
   const api = (file as unknown as { api?: { request?: (req: unknown, cb: (e: unknown, r: unknown) => void) => void } }).api
   const apiRequest = api?.request
   if (typeof apiRequest !== 'function') throw new Error('no api')
   const fDlId = (file as unknown as { downloadId?: unknown }).downloadId
   const tDlId = (target as unknown as { downloadId?: unknown }).downloadId
-  // Same request shape the SDK downloader uses (folder context included).
   const req: Record<string, unknown> = { a: 'g', g: 1, ssl: 2 }
   if (typeof fDlId === 'string' && target !== file) {
     const handle = Array.isArray(tDlId) ? tDlId[1] : tDlId
@@ -814,6 +922,31 @@ async function openCustomSession(
   })
   const dlUrl = (res as { g?: unknown }).g
   if (typeof dlUrl !== 'string' || !dlUrl.startsWith('http')) throw new Error('bad dl url')
+  return dlUrl
+}
+
+/**
+ * YouTube-style path: download URL via the file's own API, true length
+ * sniffed from head/tail ranges, then progressive MSE streaming with
+ * seeking. Throws when unavailable (caller falls back to legacy).
+ */
+async function openCustomSession(
+  key: string,
+  fileName: string,
+  total: number | null,
+  target: MegaFileLike,
+  file: MegaFileLike,
+  cancel: CancelHandle | undefined,
+  onProgress: ((p: MegaProgress) => void) | undefined,
+  durationHint: number | null
+): Promise<MegaStreamSession> {
+  const t = await import('./megaTransport')
+  const rawKey = (target as unknown as { key?: unknown }).key as Uint8Array | undefined
+  if (!rawKey || (rawKey as Uint8Array).length < 32) throw new Error('no key')
+  const mseType = mseTypeFor(fileName)
+  if (!mseType || !mseSupported(mseType)) throw new Error('no-mse')
+
+  const dlUrl = await fetchMegaDownloadUrl(file, target)
   if (cancel?.cancelled()) throw new MegaCancelledError()
 
   const { aesKey, iv } = t.deriveMegaAesIv(rawKey)
