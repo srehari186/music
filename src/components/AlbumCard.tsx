@@ -30,15 +30,15 @@ export function AlbumCard({ album }: { album: AlbumGroup }) {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-          <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide backdrop-blur">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
             <Disc3 className="h-3 w-3" /> Album
           </span>
         </div>
-        <div className="p-3">
-          <h3 className="truncate text-sm font-semibold" title={album.name}>
+        <div className="p-2 sm:p-3">
+          <h3 className="truncate text-xs font-semibold sm:text-sm" title={album.name}>
             {album.name}
           </h3>
-          <p className="truncate text-xs text-white/55" title={album.artist ?? ''}>
+          <p className="truncate text-[11px] text-white/55 sm:text-xs" title={album.artist ?? ''}>
             {album.artist ?? 'Unknown artist'} • {album.songs.length} {album.songs.length === 1 ? 'track' : 'tracks'}
           </p>
         </div>
@@ -46,9 +46,9 @@ export function AlbumCard({ album }: { album: AlbumGroup }) {
       <button
         onClick={handlePlay}
         aria-label={isCurrentAlbum && isPlaying ? `Pause album ${album.name}` : `Play album ${album.name}`}
-        className="absolute bottom-[4.5rem] right-3 grid h-11 w-11 place-items-center rounded-full bg-white text-black shadow-card transition hover:scale-105 focus-ring md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+        className="absolute bottom-[3.75rem] right-2 grid h-9 w-9 place-items-center rounded-full bg-white text-black shadow-card transition hover:scale-105 focus-ring sm:bottom-[4.5rem] sm:right-3 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 md:h-11 md:w-11"
       >
-        {isCurrentAlbum && isPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
+        {isCurrentAlbum && isPlaying ? <Pause className="h-4 w-4 sm:h-5 sm:w-5" /> : <Play className="ml-0.5 h-4 w-4 sm:h-5 sm:w-5" />}
       </button>
     </article>
   )

@@ -48,16 +48,16 @@ export function HomePage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const visibleKeys = useMemo(() => new Set(visible.map((a) => a.key)), [visible])
 
-  // Recommended: most-played albums that aren't already shown above.
+  // Recommended: most-played albums (same pool as everywhere else —
+  // repeating across shelves is normal, an empty shelf is not).
   const { albums: popularAlbums } = useMemo(() => groupSongsByAlbum(popular), [popular])
   const recommended = useMemo(
     () =>
       popularAlbums
-        .filter((g) => !visibleKeys.has(g.key) && (!q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q)))
+        .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
         .slice(0, 10),
-    [popularAlbums, visibleKeys, q]
+    [popularAlbums, q]
   )
 
   // Reset to the first page whenever the filter changes.
@@ -119,7 +119,7 @@ export function HomePage() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:grid-cols-5">
               {visible.map((a) => (
                 <AlbumCard key={a.key} album={a} />
               ))}
