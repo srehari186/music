@@ -120,10 +120,12 @@ export function HomePage() {
           />
         ) : (
           <>
-            {/* Phones: compact rows (zoomed-out list). Tablets/desktops: cards. */}
-            <div className="rounded-2xl border border-line bg-panel/60 p-1.5 sm:hidden">
-              {visible.map((a, i) => (
-                <AlbumRow key={a.key} album={a} index={(safePage - 1) * PAGE_SIZE + i} />
+            {/* Phones: one big album per swipe, left to right. Tablets/desktops: grid. */}
+            <div className="no-scrollbar -mx-1 flex touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-1 pb-2 sm:hidden">
+              {visible.map((a) => (
+                <div key={a.key} className="w-[82%] shrink-0 snap-center">
+                  <AlbumCard album={a} />
+                </div>
               ))}
             </div>
             <div className="hidden gap-4 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
