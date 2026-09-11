@@ -146,3 +146,36 @@ export async function fetchRecentlyPlayed(userId: string, limit = 20) {
   if (error) throw error
   return (data ?? []) as unknown as { id: string; played_at: string; songs: Song }[]
 }
+
+export interface AlbumOption {
+  name: string
+  artist: string
+  coverUrl: string | null
+  count: number
+}
+
+/** Distinct albums in the catalog (for the "add into existing album" picker). */
+export async function fetchAlbumList(limit = 500): Promise<AlbumOption[]> {
+  const { data, error } = await supabase
+    .from('songs')
+    .select('album, artist, cover_url')
+    .not('album', 'is', null)
+    .order('album', { ascending: true })
+    .limit(limit)
+  if (error) throw error
+  const map = new Map<string, AlbumOption>()
+  for (const r of (data ?? []) as { album: string | null; artist: string | null; cover_url: string | null }[]) {
+    const name = (r.album ?? '').trim()
+    if (!name) continue
+    const artist = (r.artist ?? '').trim()
+    const key = `${artist.toLowerCase()}|||${name.toLowerCase()}`
+    const existing = map.get(key)
+    if (existing) {
+      existing.count++
+      if (!existing.coverUrl && r.cover_url) existing.coverUrl = r.cover_url
+    } else {
+      map.set(key, { name, artist, coverUrl: r.cover_url, count: 1 })
+    }
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+}

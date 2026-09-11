@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { SongInput } from '../../services/songService'
+import { useEffect, useRef, useState } from 'react'
+import type { SongInput, AlbumOption } from '../../services/songService'
 import { classifyAudioUrl, isMegaUrl } from '../../utils'
 
 interface Props {
@@ -9,9 +9,11 @@ interface Props {
   submitLabel: string
   onSubmit: (input: SongInput) => void
   extraSpinner?: React.ReactNode
+  /** Existing albums — picking one fills album/artist/cover to add into it. */
+  existingAlbums?: AlbumOption[]
 }
 
-export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit, extraSpinner }: Props) {
+export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit, extraSpinner, existingAlbums }: Props) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [artist, setArtist] = useState(initial?.artist ?? '')
   const [album, setAlbum] = useState(initial?.album ?? '')
@@ -24,6 +26,8 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
   const [featured, setFeatured] = useState(Boolean(initial?.featured))
   const [error, setError] = useState<string | null>(null)
   const [audioHint, setAudioHint] = useState<string | null>(null)
+  const [pickedAlbum, setPickedAlbum] = useState('__new__')
+  const touchedAlbum = useRef(false)
   const [audioInfo, setAudioInfo] = useState<string | null>(() =>
     initial?.audio_url && isMegaUrl(initial.audio_url)
       ? 'MEGA link detected — it will be decrypted and streamed in the listener’s browser.'
@@ -44,6 +48,14 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
         : null
     )
   }
+
+  // Preselect the matching existing album once the list arrives
+  // (e.g. when editing), unless the admin already touched the field.
+  useEffect(() => {
+    if (touchedAlbum.current || !initial?.album || !existingAlbums) return
+    const match = existingAlbums.find((a) => a.name === initial.album)
+    if (match) setPickedAlbum(match.name)
+  }, [existingAlbums, initial?.album])
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,7 +113,53 @@ export function SongFormFields({ initial, busy, busyLabel, submitLabel, onSubmit
         </div>
         <div>
           <label htmlFor="sf-album" className="mb-1.5 block text-sm font-medium">Album</label>
-          <input id="sf-album" value={album} onChange={(e) => setAlbum(e.target.value)} placeholder="Afterglow" className={inputCls} />
+          {existingAlbums && existingAlbums.length > 0 ? (
+            <>
+              <label htmlFor="sf-albumpick" className="sr-only">Choose an existing album or start a new one</label>
+              <select
+                id="sf-albumpick"
+                value={pickedAlbum}
+                onChange={(e) => {
+                  touchedAlbum.current = true
+                  const v = e.target.value
+                  setPickedAlbum(v)
+                  if (v === '__new__') {
+                    setAlbum('')
+                  } else {
+                    const found = existingAlbums.find((a) => a.name === v)
+                    if (found) {
+                      setAlbum(found.name)
+                      setArtist(found.artist)
+                      setCoverUrl(found.coverUrl ?? '')
+                    }
+                  }
+                }}
+                className={inputCls}
+              >
+                <option value="__new__">＋ New album…</option>
+                {existingAlbums.map((a) => (
+                  <option key={`${a.artist}|||${a.name}`} value={a.name}>
+                    {a.name}{a.artist ? ` — ${a.artist}` : ''} ({a.count} {a.count === 1 ? 'track' : 'tracks'})
+                  </option>
+                ))}
+              </select>
+              <input
+                id="sf-album"
+                value={album}
+                onChange={(e) => {
+                  touchedAlbum.current = true
+                  setAlbum(e.target.value)
+                }}
+                placeholder="Album name"
+                className={`${inputCls} mt-2`}
+              />
+              <p className="mt-1.5 text-xs text-white/40">
+                Pick an existing album to add this song into it (artist & cover fill in), or type a new name.
+              </p>
+            </>
+          ) : (
+            <input id="sf-album" value={album} onChange={(e) => setAlbum(e.target.value)} placeholder="Afterglow" className={inputCls} />
+          )}
         </div>
         <div>
           <label htmlFor="sf-genre" className="mb-1.5 block text-sm font-medium">Genre</label>

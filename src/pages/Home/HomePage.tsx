@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Disc3, Wand2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Disc3, Sparkles, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { AlbumCard } from '../../components/AlbumCard'
 import { AlbumRow } from '../../components/AlbumRow'
+import { AlbumShelf, EmptyState } from '../../components/AlbumShelf'
 import { SkeletonCards } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
-import { fetchFeaturedSongs, fetchPopularSongs } from '../../services/songService'
+import { fetchFeaturedSongs, fetchPopularSongs, fetchRecentSongs } from '../../services/songService'
 import { friendlyError, groupSongsByAlbum } from '../../utils'
 
 const PAGE_SIZE = 10
@@ -15,6 +16,7 @@ export function HomePage() {
   const { profile } = useAuth()
   const [featured, setFeatured] = useState<import('../../types/database').Song[]>([])
   const [popular, setPopular] = useState<import('../../types/database').Song[]>([])
+  const [recent, setRecent] = useState<import('../../types/database').Song[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -64,9 +66,10 @@ export function HomePage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [f, p] = await Promise.all([fetchFeaturedSongs(200), fetchPopularSongs(100)])
+      const [f, p, r] = await Promise.all([fetchFeaturedSongs(200), fetchPopularSongs(100), fetchRecentSongs(30)])
       setFeatured(f)
       setPopular(p)
+      setRecent(r)
     } catch (e) {
       toast.error(friendlyError(e, 'Could not load music. Check your Supabase setup.'))
     } finally {
@@ -103,6 +106,16 @@ export function HomePage() {
     [popularAlbums, q]
   )
 
+  // Recently added: newest albums first.
+  const { albums: allRecent } = useMemo(() => groupSongsByAlbum(recent), [recent])
+  const recentAlbums = useMemo(
+    () =>
+      allRecent
+        .filter((g) => !q || `${g.name} ${g.artist ?? ''}`.toLowerCase().includes(q))
+        .slice(0, 10),
+    [allRecent, q]
+  )
+
   // Reset to the first page whenever the filter changes.
   useEffect(() => {
     setPage(1)
@@ -135,12 +148,20 @@ export function HomePage() {
           {profile?.display_name ? `${profile.display_name}, ride` : 'Ride'} your sound wave
         </h1>
         <p className="mt-2 max-w-xl text-sm text-white/60">
-          Featured albums, hand-picked for you. Open any album to play every song inside.
+          Fresh drops and featured albums, hand-picked for you. Open any album to play every song inside.
         </p>
         <div className="mt-5 max-w-xl">
           <SearchBar value={query} onChange={setQuery} placeholder="Filter albums by name or artist…" />
         </div>
       </section>
+
+      <AlbumShelf
+        title="Recently added"
+        subtitle="The latest drops on Waveora"
+        icon={<Sparkles className="h-5 w-5 text-ember" />}
+        albums={recentAlbums}
+        emptyMessage={recent.length === 0 ? 'No music yet. Ask an admin to add songs or import an album.' : 'No recent albums found.'}
+      />
 
       <section aria-label="Featured albums">
         <div className="mb-4 flex items-center gap-3">
@@ -314,12 +335,4 @@ function pageList(current: number, total: number): (number | '…')[] {
     prev = n
   }
   return out
-}
-
-export function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-line bg-panel/40 px-6 py-10 text-center text-sm text-white/50">
-      {message}
-    </div>
-  )
 }

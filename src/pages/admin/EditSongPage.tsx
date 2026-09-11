@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
-import { adminUpdateSong, type SongInput } from '../../services/songService'
+import { adminUpdateSong, fetchAlbumList, type AlbumOption, type SongInput } from '../../services/songService'
 import type { Song } from '../../types/database'
 import { ButtonSpinner, LoadingScreen } from '../../components/Loading'
 import { friendlyError } from '../../utils'
@@ -14,6 +14,11 @@ export function EditSongPage() {
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [albums, setAlbums] = useState<AlbumOption[]>([])
+
+  useEffect(() => {
+    fetchAlbumList().then(setAlbums).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -77,6 +82,7 @@ export function EditSongPage() {
         submitLabel="Save changes"
         onSubmit={onSubmit}
         extraSpinner={<ButtonSpinner />}
+        existingAlbums={albums}
       />
     </div>
   )

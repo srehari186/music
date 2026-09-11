@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { adminCreateSong, type SongInput } from '../../services/songService'
+import { adminCreateSong, fetchAlbumList, type AlbumOption, type SongInput } from '../../services/songService'
 import { ButtonSpinner } from '../../components/Loading'
 import { classifyAudioUrl, friendlyError } from '../../utils'
 import { SongFormFields } from './SongFormFields'
@@ -9,6 +9,11 @@ import { SongFormFields } from './SongFormFields'
 export function AddSongPage() {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
+  const [albums, setAlbums] = useState<AlbumOption[]>([])
+
+  useEffect(() => {
+    fetchAlbumList().then(setAlbums).catch(() => {})
+  }, [])
 
   const onSubmit = async (input: SongInput) => {
     const check = classifyAudioUrl(input.audio_url)
@@ -36,7 +41,7 @@ export function AddSongPage() {
         <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight">Add song</h1>
         <p className="mt-1 text-sm text-white/55">Paste a browser-compatible audio URL (e.g. https://…/song.mp3) or a MEGA file/folder link — MEGA links are decrypted and streamed in the listener’s browser.</p>
       </div>
-      <SongFormFields busy={busy} busyLabel="Adding…" submitLabel="Add song" onSubmit={onSubmit} extraSpinner={<ButtonSpinner />} />
+      <SongFormFields busy={busy} busyLabel="Adding…" submitLabel="Add song" onSubmit={onSubmit} extraSpinner={<ButtonSpinner />} existingAlbums={albums} />
     </div>
   )
 }
