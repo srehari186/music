@@ -9,7 +9,6 @@
 * { -webkit-tap-highlight-color: transparent; }
 
 html, body {
-  overflow-x: clip;
   max-width: 100%;
 }
 
