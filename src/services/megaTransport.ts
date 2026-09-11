@@ -267,7 +267,8 @@ export interface CustomStreamInput {
   hooks: CustomStreamHooks
 }
 
-const SEGMENT = 1048576 // 1MB fetch segments
+const SEGMENT = 2097152 // 2MB 16-aligned fetch segments
+const WORKERS = 4 // parallel connections: MEGA throttles per connection
 
 export function startCustomStream(input: CustomStreamInput): CustomStreamSession {
   const { downloadUrl, cryptoKey, iv, totalBytes, fileName, mseType, head, hooks } = input
@@ -310,10 +311,17 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
   const index = ext === 'mp3' ? new Mp3SeekIndex() : null
   const queue: Uint8Array[] = []
   const held: Uint8Array[] = []
+  // Blob cache stays valid only while bytes arrive in file order end-to-end.
+  // Any seek-ahead restarts mid-file, so caching is disabled from then on.
+  let cacheable = true
   let sb: SourceBuffer | null = null
   let downloadEnded = false
-  let fetchOffset = head.offset + head.bytes.length
-  let decryptedBytes = head.bytes.length
+  // fetchCursor: next range workers claim. appendOffset: next offset MSE needs.
+  // pending: completed out-of-order segments waiting for their turn.
+  let fetchCursor = head.offset + head.bytes.length
+  let appendOffset = fetchCursor
+  let receivedBytes = head.bytes.length
+  const pending = new Map<number, Uint8Array>()
   let controller = new AbortController()
   let runToken = 0
   let lastBytesAt = Date.now()
@@ -335,17 +343,26 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
 
   const reportProgress = () => {
     hooks.onProgress({
-      bytesLoaded: decryptedBytes,
+      bytesLoaded: receivedBytes,
       bytesTotal: totalBytes,
-      ratio: totalBytes && totalBytes > 0 ? Math.min(1, decryptedBytes / totalBytes) : null
+      ratio: totalBytes && totalBytes > 0 ? Math.min(1, receivedBytes / totalBytes) : null
     })
   }
 
   const pump = () => {
     if (!sb || sb.updating) return
+    // Move in-order completed segments into the append queue.
+    while (pending.has(appendOffset)) {
+      const chunk = pending.get(appendOffset) as Uint8Array
+      pending.delete(appendOffset)
+      if (index) index.feed(chunk, appendOffset)
+      appendOffset += chunk.length
+      held.push(chunk)
+      queue.push(chunk)
+    }
     const chunk = queue.shift()
     if (!chunk) {
-      if (downloadEnded) finishOk()
+      if (downloadEnded && pending.size === 0) finishOk()
       return
     }
     try {
@@ -372,36 +389,50 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
     }
   }
 
-  const runFrom = async (offset: number, token: number): Promise<void> => {
-    try {
-      let off = offset
-      for (;;) {
-        if (token !== runToken || hooks.cancel.cancelled()) return // superseded: silent
-        if (totalBytes != null && off >= totalBytes) break
-        const plain = await fetchRange(off, SEGMENT, controller.signal, token)
-        if (plain === null) {
-          if (token !== runToken || hooks.cancel.cancelled()) return
-          throw new Error('fetch failed')
-        }
-        if (plain.length === 0) break
-        if (index) index.feed(plain, off)
-        off += plain.length
-        fetchOffset = off
-        decryptedBytes = Math.max(decryptedBytes, off)
-        held.push(plain)
-        queue.push(plain)
-        touch()
-        reportProgress()
-        pump()
-        if (totalBytes != null && off >= totalBytes) break
+  /** Fetch loop for one worker: claims 2MB ranges until EOF or supersede. */
+  const worker = async (token: number): Promise<void> => {
+    for (;;) {
+      if (token !== runToken || hooks.cancel.cancelled()) return // superseded: silent
+      const off = fetchCursor
+      if (totalBytes != null && off >= totalBytes) return
+      fetchCursor = off + SEGMENT
+      const plain = await fetchRange(off, SEGMENT, controller.signal, token)
+      // Re-check after the await: a seek may have superseded this worker
+      // while it was in flight — never store stale segments.
+      if (token !== runToken || hooks.cancel.cancelled()) return
+      if (plain === null) {
+        throw new Error('fetch failed')
       }
-      if (token === runToken && !hooks.cancel.cancelled()) {
+      if (plain.length === 0) {
+        if (totalBytes == null) return // unknown size: nothing more to claim
+        throw new Error('short read')
+      }
+      pending.set(off, plain)
+      receivedBytes += plain.length
+      touch()
+      reportProgress()
+      pump()
+    }
+  };
+
+  /** (Re)starts the parallel fetch from an offset. */
+  const startWorkers = (fromOffset: number, token: number) => {
+    fetchCursor = fromOffset
+    let finished = 0
+    const onWorkerDone = () => {
+      finished++
+      if (finished === WORKERS && token === runToken && !hooks.cancel.cancelled()) {
         downloadEnded = true
         pump()
       }
-    } catch (e) {
-      if (token !== runToken) return // superseded: silent
+    }
+    const onWorkerError = (e: unknown) => {
+      if (token !== runToken) return
+      runToken++
       fail(e)
+    }
+    for (let i = 0; i < WORKERS; i++) {
+      void worker(token).then(onWorkerDone, onWorkerError)
     }
   }
 
@@ -421,15 +452,14 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
       }
       sb.addEventListener('updateend', pump)
       sb.addEventListener('error', () => fail(new Error('sb-error')))
-      // Seed with the preloaded head, then stream the rest.
+      // Seed with the preloaded head, then stream the rest on 4 workers.
       if (index) index.feed(head.bytes, head.offset)
       held.push(head.bytes)
       queue.push(head.bytes)
       touch()
       reportProgress()
       pump()
-      runToken++
-      void runFrom(fetchOffset, runToken)
+      startWorkers(fetchCursor, runToken)
     },
     { once: true }
   )
@@ -480,19 +510,11 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
         return false
       }
       queue.length = 0
+      pending.clear()
       downloadEnded = false
-      // Fetch from the new offset; resolve once the first chunk is queued.
-      const plain = await fetchRange(offset, SEGMENT, controller.signal, token)
-      if (plain === null || plain.length === 0 || token !== runToken || hooks.cancel.cancelled()) return false
-      if (index) index.feed(plain, offset)
-      fetchOffset = offset + plain.length
-      decryptedBytes = Math.max(decryptedBytes, fetchOffset)
-      held.push(plain)
-      queue.push(plain)
-      touch()
-      reportProgress()
-      pump()
-      void runFrom(fetchOffset, token)
+      cacheable = false // mid-file restart: bytes are no longer end-to-end
+      appendOffset = offset
+      startWorkers(offset, token)
       return true
     } catch {
       return false
@@ -509,5 +531,5 @@ export function startCustomStream(input: CustomStreamInput): CustomStreamSession
     if (!settled) fail(new Error('__cancelled__'))
   }
 
-  return { url, done, seekAhead, destroy, held: () => held }
+  return { url, done, seekAhead, destroy, held: () => (cacheable ? held : []) }
 }
