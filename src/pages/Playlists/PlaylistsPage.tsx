@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ListMusic, Pencil, Plus, Trash2 } from 'lucide-react'
+import { PageHeader } from '../../components/PageHeader'
 import type { Playlist } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { PlaylistCard } from '../../components/PlaylistCard'
@@ -78,11 +79,12 @@ export function PlaylistsPage() {
   if (loading) return <LoadingScreen label="Loading playlists…" />
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight">Playlists</h1>
-        <p className="mt-1 text-sm text-white/55">Create collections for every mood, then play or shuffle them.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={<ListMusic className="h-5 w-5 text-flame" />}
+        title="Playlists"
+        subtitle="Create collections for every mood, then play or shuffle them."
+      />
 
       <form onSubmit={onCreate} className="glass rounded-2xl p-4 sm:p-5" aria-label="Create playlist">
         <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70">

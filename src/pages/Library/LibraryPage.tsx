@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Clock3, Heart, ListMusic } from 'lucide-react'
+import { PageHeader } from '../../components/PageHeader'
 import type { Playlist, Song } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMusicPlayer } from '../../contexts/MusicPlayerContext'
@@ -43,11 +44,12 @@ export function LibraryPage() {
   if (loading) return <LoadingScreen label="Loading your library…" />
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight">Your Library</h1>
-        <p className="mt-1 text-sm text-white/55">Playlists, liked songs and recent history — all yours.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={<ListMusic className="h-5 w-5 text-flame" />}
+        title="Your Library"
+        subtitle="Playlists, liked songs and recent history — all yours."
+      />
 
       <section aria-label="Playlists">
         <div className="mb-4 flex items-center justify-between">

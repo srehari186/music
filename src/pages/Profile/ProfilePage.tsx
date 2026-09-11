@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { User } from 'lucide-react'
+import { PageHeader } from '../../components/PageHeader'
 import { useAuth } from '../../contexts/AuthContext'
 import { ButtonSpinner, LoadingScreen } from '../../components/Loading'
 import { supabase } from '../../lib/supabase'
@@ -48,10 +50,11 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight">Profile</h1>
-        <p className="mt-1 text-sm text-white/55">Manage how you appear on Waveora.</p>
-      </div>
+      <PageHeader
+        icon={<User className="h-5 w-5 text-flame" />}
+        title="Profile"
+        subtitle="Manage how you appear on Waveora."
+      />
 
       <div className="glass flex flex-wrap items-center gap-4 rounded-3xl p-6">
         {avatarUrl ? (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Heart } from 'lucide-react'
+import { Heart, Play } from 'lucide-react'
+import { PageHeader } from '../../components/PageHeader'
 import type { Song } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMusicPlayer } from '../../contexts/MusicPlayerContext'
@@ -37,23 +38,21 @@ export function LikedSongsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass flex flex-wrap items-center gap-4 rounded-3xl p-6">
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose to-primary shadow-glow">
-          <Heart className="h-8 w-8 fill-current text-white" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-3xl font-extrabold tracking-tight">Liked Songs</h1>
-          <p className="mt-1 text-sm text-white/55">{songs.length} saved {songs.length === 1 ? 'song' : 'songs'}</p>
-        </div>
-        {songs.length > 0 && (
-          <button
-            onClick={() => playSongs(songs, 0)}
-            className="w-full rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 focus-ring sm:w-auto"
-          >
-            Play all
-          </button>
-        )}
-      </div>
+      <PageHeader
+        icon={<Heart className="h-5 w-5 fill-current text-rose" />}
+        title="Liked Songs"
+        subtitle={`${songs.length} saved ${songs.length === 1 ? 'song' : 'songs'}`}
+        action={
+          songs.length > 0 ? (
+            <button
+              onClick={() => playSongs(songs, 0)}
+              className="flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/85 focus-ring"
+            >
+              <Play className="h-4 w-4 fill-current" /> Play all
+            </button>
+          ) : undefined
+        }
+      />
 
       {songs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-panel/40 px-6 py-12 text-center">

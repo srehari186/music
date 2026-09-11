@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { Search } from 'lucide-react'
+import { PageHeader } from '../../components/PageHeader'
 import type { Playlist, Song } from '../../types/database'
 import { useAuth } from '../../contexts/AuthContext'
 import { SearchBar } from '../../components/SearchBar'
@@ -54,10 +56,11 @@ export function SearchPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight">Search</h1>
-        <p className="mt-1 text-sm text-white/55">Find songs by title, artist, album or genre.</p>
-      </div>
+      <PageHeader
+        icon={<Search className="h-5 w-5 text-flame" />}
+        title="Search"
+        subtitle="Find songs by title, artist, album or genre."
+      />
       <SearchBar value={query} onChange={setQuery} />
       {busy && <p className="text-sm text-white/50" role="status">Searching…</p>}
       {!busy && searched && results.length === 0 && (
