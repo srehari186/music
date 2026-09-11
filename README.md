@@ -13,6 +13,7 @@ An original, production-ready music streaming web app inspired by modern platfor
 - Album pages (`/album?name=…&artist=…`): songs imported from one folder share an album and appear as a single album card — click to see and play every song
 - Server-side search (title, artist, album, genre) — never downloads the whole table
 - Persistent bottom player: play/pause, next/prev, seek, volume, mute, shuffle, repeat (off/all/one), queue
+- Full-screen Now Playing: big artwork, seek, volume, Up Next queue, plus song-based Recommended list with Shuffle play
 - Like/unlike songs, playlists (create/rename/delete, add/remove, play, shuffle), profile editing
 - Playback error handling: *“Playback could not be started. This audio source may not support browser streaming…”*
 

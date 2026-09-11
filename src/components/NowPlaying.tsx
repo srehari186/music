@@ -12,11 +12,13 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  Wand2,
   X
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useMusicPlayer } from '../contexts/MusicPlayerContext'
-import { getLikedSongIds, likeSong, unlikeSong } from '../services/songService'
+import { getLikedSongIds, likeSong, unlikeSong, fetchRecommendedSongs } from '../services/songService'
+import type { Song } from '../types/database'
 import { coverFallback, formatTime, friendlyError } from '../utils'
 
 export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -25,6 +27,7 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
   const song = p.currentSong
   const [liked, setLiked] = useState(false)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [recommended, setRecommended] = useState<Song[]>([])
 
   // Lock background scroll + close on Escape while open
   useEffect(() => {
@@ -54,13 +57,37 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
     }
   }, [open, user, song])
 
+  useEffect(() => {
+    if (!open || !song) {
+      if (!open) setRecommended([])
+      return
+    }
+    let cancelled = false
+    fetchRecommendedSongs(song, 8).then((rows) => {
+      if (!cancelled) setRecommended(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, song])
+
   if (!open || !song) return null
 
   const progress = p.duration > 0 ? (p.currentTime / p.duration) * 100 : 0
   const fetching = p.isLoading && p.loadDetail != null
 
-  const toggleLike = async () => {
-    if (!user || likeBusy) return
+  const shuffleRecommended = () => {
+    if (recommended.length === 0) return
+    const shuffled = [...recommended]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    p.playSongs(shuffled, 0)
+    toast.success('Shuffling recommended songs')
+  }
+
+  const toggleLike = async () => {    if (!user || likeBusy) return
     setLikeBusy(true)
     try {
       if (liked) {
@@ -247,6 +274,45 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
                     <span className="w-5 shrink-0 text-xs text-white/40">{i + 1}</span>
                     <span className="flex-1 truncate font-medium">{track.title}</span>
                     <span className="max-w-[40%] truncate text-xs text-white/50">{track.artist}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Recommended for this song */}
+        {recommended.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-white/50">
+                <Wand2 className="h-4 w-4" /> Recommended
+              </h2>
+              <button
+                onClick={shuffleRecommended}
+                className="flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-bold transition hover:bg-white hover:text-black focus-ring"
+              >
+                <Shuffle className="h-3.5 w-3.5" /> Shuffle play
+              </button>
+            </div>
+            <ol className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-line bg-black/30 p-2">
+              {recommended.map((track) => (
+                <li key={track.id}>
+                  <button
+                    onClick={() => p.playSong(track, recommended)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-white/5 focus-ring"
+                  >
+                    <img
+                      src={track.cover_url || coverFallback(track.title, track.artist)}
+                      alt=""
+                      loading="lazy"
+                      className="h-9 w-9 shrink-0 rounded-lg object-cover"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{track.title}</span>
+                      <span className="block truncate text-xs text-white/50">{track.artist}</span>
+                    </span>
+                    <Play className="h-4 w-4 shrink-0 text-white/40" />
                   </button>
                 </li>
               ))}

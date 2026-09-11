@@ -147,6 +147,54 @@ export async function fetchRecentlyPlayed(userId: string, limit = 20) {
   return (data ?? []) as unknown as { id: string; played_at: string; songs: Song }[]
 }
 
+/**
+ * Songs recommended for a given track: same artist first, then same genre,
+ * topped up with most-played tracks. Never includes the song itself.
+ */
+export async function fetchRecommendedSongs(song: Song, limit = 12): Promise<Song[]> {
+  const out: Song[] = []
+  const seen = new Set<string>([song.id])
+  const take = (rows: Song[] | null | undefined) => {
+    for (const s of rows ?? []) {
+      if (seen.has(s.id)) continue
+      seen.add(s.id)
+      out.push(s)
+      if (out.length >= limit) break
+    }
+  }
+  try {
+    if (song.artist) {
+      const { data } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('artist', song.artist)
+        .order('play_count', { ascending: false })
+        .limit(limit)
+      take((data ?? []) as Song[])
+    }
+    if (out.length < limit && song.genre) {
+      const { data } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('genre', song.genre)
+        .order('play_count', { ascending: false })
+        .limit(limit)
+      take((data ?? []) as Song[])
+    }
+    if (out.length < limit) {
+      const { data } = await supabase
+        .from('songs')
+        .select('*')
+        .order('play_count', { ascending: false })
+        .limit(limit)
+      take((data ?? []) as Song[])
+    }
+  } catch {
+    /* recommendations are best-effort */
+  }
+  return out
+}
+
 export interface AlbumOption {
   name: string
   artist: string
