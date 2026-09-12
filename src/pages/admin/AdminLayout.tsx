@@ -59,7 +59,7 @@ export function AdminLayout() {
         </div>
       </aside>
       <div className="flex-1">
-        <header className="sticky top-0 z-30 border-b border-line bg-void/85 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-30 border-b border-line bg-void/70 backdrop-blur-xl backdrop-saturate-150 lg:hidden">
           <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 text-sm">
             <NavLink to="/admin" end className="rounded-lg bg-white/5 px-3 py-1.5 font-semibold">Dashboard</NavLink>
             <NavLink to="/admin/songs" className="rounded-lg bg-white/5 px-3 py-1.5 font-semibold">Songs</NavLink>

@@ -107,7 +107,7 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <div
-      className="fixed inset-0 z-[45] flex flex-col overflow-hidden bg-void"
+      className="fixed inset-0 z-[45] flex flex-col overflow-hidden bg-void/80 backdrop-blur-2xl backdrop-saturate-150"
       role="dialog"
       aria-modal="true"
       aria-label={`Now playing ${song.title}`}

@@ -50,7 +50,7 @@ export default function App() {
           <Toaster
             position="top-center"
             toastOptions={{
-              style: { background: '#1f0c0e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }
+              style: { background: 'rgba(31,12,14,0.82)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px) saturate(180%)' }
             }}
           />
           <Routes>
