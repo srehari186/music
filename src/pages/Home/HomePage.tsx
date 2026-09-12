@@ -139,18 +139,18 @@ export function HomePage() {
   const pageNumbers = pageList(safePage, totalPages)
 
   return (
-    <div className="space-y-10">
-      <section className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8">
+    <div className="space-y-6 sm:space-y-10">
+      <section className="glass relative overflow-hidden rounded-3xl p-5 sm:p-8">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/25 blur-[100px]" aria-hidden />
         <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-flame/15 blur-[100px]" aria-hidden />
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-flame">{greeting}</p>
         <h1 className="mt-2 break-words font-display text-[1.65rem] font-extrabold leading-tight tracking-tight sm:text-4xl">
           {profile?.display_name ? `${profile.display_name}, ride` : 'Ride'} your sound wave
         </h1>
-        <p className="mt-2 max-w-xl text-sm text-white/60">
+        <p className="mt-2 hidden max-w-xl text-sm text-white/60 sm:block">
           Fresh drops and featured albums, hand-picked for you. Open any album to play every song inside.
         </p>
-        <div className="mt-5 max-w-xl">
+        <div className="mt-4 max-w-xl sm:mt-5">
           <SearchBar value={query} onChange={setQuery} placeholder="Filter albums by name or artist…" />
         </div>
       </section>
@@ -169,7 +169,7 @@ export function HomePage() {
             <Disc3 className="h-5 w-5 text-flame" />
           </span>
           <div>
-            <h2 className="font-display text-xl font-bold tracking-tight">Featured</h2>
+            <h2 className="font-display text-lg font-bold tracking-tight sm:text-xl">Featured</h2>
             <p className="text-xs text-white/50">
               {filtered.length} {filtered.length === 1 ? 'album' : 'albums'}
               {totalPages > 1 && <span className="hidden sm:inline">{` • Page ${safePage} of ${totalPages}`}</span>}
@@ -294,7 +294,7 @@ export function HomePage() {
             <Wand2 className="h-5 w-5 text-primary-soft" />
           </span>
           <div>
-            <h2 className="font-display text-xl font-bold tracking-tight">Recommended for you</h2>
+            <h2 className="font-display text-lg font-bold tracking-tight sm:text-xl">Recommended for you</h2>
             <p className="text-xs text-white/50">Popular albums you might like</p>
           </div>
         </div>

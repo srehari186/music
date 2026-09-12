@@ -71,7 +71,7 @@ export function AlbumShelf({ title, subtitle, icon, albums, emptyMessage }: Shel
       <div className="mb-4 flex items-center gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-panel">{icon}</span>
         <div>
-          <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
+          <h2 className="font-display text-lg font-bold tracking-tight sm:text-xl">{title}</h2>
           <p className="text-xs text-white/50">{subtitle}</p>
         </div>
       </div>
