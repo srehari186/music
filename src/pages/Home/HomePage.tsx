@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Disc3, Sparkles, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { AlbumCard } from '../../components/AlbumCard'
-import { AlbumRow } from '../../components/AlbumRow'
+import { MobileHome } from './MobileHome'
 import { AlbumShelf, EmptyState } from '../../components/AlbumShelf'
 import { SkeletonCards } from '../../components/Loading'
 import { SearchBar } from '../../components/SearchBar'
@@ -20,48 +20,6 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const stripRef = useRef<HTMLDivElement | null>(null)
-  const holdTimer = useRef<number | null>(null)
-  const holdFired = useRef(false)
-
-  const scrollStrip = useCallback((dir: 1 | -1) => {
-    const el = stripRef.current
-    if (!el) return
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
-  }, [])
-
-  const stopHold = useCallback(() => {
-    if (holdTimer.current !== null) {
-      clearInterval(holdTimer.current)
-      holdTimer.current = null
-    }
-  }, [])
-
-  // Press-and-hold glides to the first/last album; a quick tap steps once.
-  const startHold = useCallback(
-    (dir: 1 | -1) => {
-      holdFired.current = false
-      scrollStrip(dir)
-      stopHold()
-      holdTimer.current = window.setInterval(() => {
-        const el = stripRef.current
-        if (!el) {
-          stopHold()
-          return
-        }
-        const max = el.scrollWidth - el.clientWidth
-        if ((dir === 1 && el.scrollLeft >= max - 4) || (dir === -1 && el.scrollLeft <= 4)) {
-          stopHold()
-          return
-        }
-        holdFired.current = true
-        scrollStrip(dir)
-      }, 350)
-    },
-    [scrollStrip, stopHold]
-  )
-
-  useEffect(() => stopHold, [stopHold])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -139,7 +97,23 @@ export function HomePage() {
   const pageNumbers = pageList(safePage, totalPages)
 
   return (
-    <div className="space-y-6 sm:space-y-10">
+    <div>
+      {/* Phones + small tablets: dedicated mobile layout. */}
+      <div className="lg:hidden">
+        <MobileHome
+          greeting={greeting}
+          profile={profile}
+          query={query}
+          onQuery={setQuery}
+          recentAlbums={recentAlbums}
+          featuredAlbums={filtered}
+          recommendedAlbums={recommended}
+          featuredSongs={featured}
+          hasMusic={featured.length > 0 || recent.length > 0}
+        />
+      </div>
+      {/* Desktops: hero + shelves + pagination. */}
+      <div className="hidden space-y-10 lg:block">
       <section className="glass relative overflow-hidden rounded-3xl p-5 sm:p-8">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/25 blur-[100px]" aria-hidden />
         <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-flame/15 blur-[100px]" aria-hidden />
@@ -183,68 +157,14 @@ export function HomePage() {
           />
         ) : (
           <>
-            {/* Phones: compact swipe strip (no snap) + arrows that also work
-                by hold-to-glide. Tablets/desktops: grid. */}
-            <div className="relative sm:hidden">
-              <div
-                ref={stripRef}
-                className="no-scrollbar -mx-1 flex touch-pan-x gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2"
-              >
-                {filtered.map((a) => (
-                  <div key={a.key} className="w-32 shrink-0">
-                    <AlbumCard album={a} />
-                  </div>
-                ))}
-              </div>
-              {filtered.length > 2 && (
-                <>
-                  <button
-                    onClick={() => {
-                      if (holdFired.current) {
-                        holdFired.current = false
-                        return
-                      }
-                      scrollStrip(-1)
-                    }}
-                    onPointerDown={() => startHold(-1)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onContextMenu={(e) => e.preventDefault()}
-                    aria-label="Scroll albums left (hold to glide to the first)"
-                    className="absolute left-0 top-[30%] grid h-9 w-9 -translate-y-1/2 touch-none place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (holdFired.current) {
-                        holdFired.current = false
-                        return
-                      }
-                      scrollStrip(1)
-                    }}
-                    onPointerDown={() => startHold(1)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onContextMenu={(e) => e.preventDefault()}
-                    aria-label="Scroll albums right (hold to glide to the last)"
-                    className="absolute right-0 top-[30%] grid h-9 w-9 -translate-y-1/2 touch-none place-items-center rounded-full border border-line bg-black/70 text-white backdrop-blur transition active:bg-primary focus-ring"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="hidden gap-4 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-4 gap-4 xl:grid-cols-5">
               {visible.map((a) => (
                 <AlbumCard key={a.key} album={a} />
               ))}
             </div>
 
             {totalPages > 1 && (
-              <nav className="mt-6 hidden flex-wrap items-center justify-center gap-1.5 sm:flex" aria-label="Album pages">
+              <nav className="mt-6 flex flex-wrap items-center justify-center gap-1.5" aria-label="Album pages">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage === 1}
@@ -302,22 +222,14 @@ export function HomePage() {
         {recommended.length === 0 ? (
           <EmptyState message="More recommendations coming soon." />
         ) : (
-          <>
-            <div className="rounded-2xl border border-line bg-panel/60 p-1.5 sm:hidden">
-              {recommended.map((a, i) => (
-                <AlbumRow key={a.key} album={a} index={i} />
-              ))}
-            </div>
-            <div className="no-scrollbar -mx-1 hidden gap-4 overflow-x-auto px-1 pb-2 snap-x sm:flex md:grid md:grid-cols-4 md:overflow-visible lg:grid-cols-5">
-              {recommended.map((a) => (
-                <div key={a.key} className="w-44 shrink-0 snap-start md:w-auto">
-                  <AlbumCard album={a} />
-                </div>
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-4 gap-4 xl:grid-cols-5">
+            {recommended.map((a) => (
+              <AlbumCard key={a.key} album={a} />
+            ))}
+          </div>
         )}
       </section>
+      </div>
     </div>
   )
 }
