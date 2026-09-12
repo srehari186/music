@@ -26,7 +26,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-line bg-abyss/60 p-4 md:flex" aria-label="Primary">
+    <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-line bg-abyss/60 p-4 lg:flex" aria-label="Primary">
       <div className="px-1 py-2">
         <Logo />
       </div>
